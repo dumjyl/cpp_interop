@@ -1,8 +1,0 @@
-set -e
-set -x
-sudo installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg -target /
-git clone https://github.com/nim-lang/Nim
-pushd Nim
-sh build_all.sh
-popd
-echo "##vso[task.prependpath]$PWD/Nim/bin"

@@ -1,5 +1,0 @@
-set -e
-set -x
-wget --quiet "http://releases.llvm.org/9.0.0/${LLVM_CLANG}.tar.xz"
-tar -xf "${LLVM_CLANG}.tar.xz"
-echo "##vso[task.prependpath]$PWD/${LLVM_CLANG}/bin"

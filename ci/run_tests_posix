@@ -1,7 +1,0 @@
-set -e
-set -x
-echo LLVM and clang installed to: $(llvm-config --prefix)
-echo Nim version: $(nim -v)
-echo "PATH=$PATH"
-nimble install -d -y
-nimble test
