@@ -13,7 +13,7 @@ let llvm_dir = block:
    output.strip_line_end()
    output
 
-import ../src/"clang_frontend.nims"
+import ../src/"clang_tooling.nims"
 
 let dir = "clang-frontend"
 let lib_dir = dir/"lib"
