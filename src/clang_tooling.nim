@@ -3,15 +3,18 @@ import
   pkg/std_ext/mem_utils,
   pkg/std_ext/c_ffi/[str,
                      vec],
-  clang_frontend/[pretty_printer,
-                  ap_int,
-                  common,
-                  string_ref,
-                  aps_int,
-                  src_info,
-                  twine,
-                  iterator_range,
-                  specific_decl_iterator]
+  clang_tooling/[build,
+                 pretty_printer,
+                 ap_int,
+                 common,
+                 string_ref,
+                 aps_int,
+                 src_info,
+                 twine,
+                 iterator_range,
+                 specific_decl_iterator]
+
+build.flags()
 
 const
   declH = "clang/AST/Decl.h"
@@ -906,7 +909,7 @@ type
     Export, ExternCContext, FileScopeAsm, Friend, FriendTemplate, Import,
     LinkageSpec, Label, Namespace, NamespaceAlias, ObjCCompatibleAlias,
     ObjCCategory, ObjCCategoryImpl, ObjCImplementation, ObjCInterface,
-    ObjCProtocol, ObjCMethod, bjCProperty, BuiltinTemplate, Concept,
+    ObjCProtocol, ObjCMethod, ObjCProperty, BuiltinTemplate, Concept,
     ClassTemplate, FunctionTemplate, TypeAliasTemplate, VarTemplate,
     TemplateTemplateParm, Enum, Record, CXXRecord, ClassTemplateSpecialization,
     ClassTemplatePartialSpecialization, TemplateTypeParm, ObjCTypeParam,
