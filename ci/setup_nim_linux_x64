@@ -1,5 +1,0 @@
-set -e
-set -x
-wget --quiet https://github.com/nim-lang/nightlies/releases/download/2020-01-13-devel-ee1563e/nim-1.1.1-linux_x64.tar.xz
-tar -xf nim-1.1.1-linux_x64.tar.xz
-echo "##vso[task.prependpath]$PWD/nim-1.1.1/bin"

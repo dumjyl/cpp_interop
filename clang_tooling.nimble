@@ -5,7 +5,11 @@ license = "MIT"
 backend = "cpp"
 src_dir = "src"
 
-requires "https://github.com/dumjyl/std-ext >= 1.5.0"
+requires "https://github.com/dumjyl/std-ext >= 1.5.1"
+
+import
+   os,
+   strutils
 
 task test, "Run tests":
    const expected_output = """
@@ -14,8 +18,12 @@ foo
 foo::NiceClass
 foo::NiceClass::with_a_field
 foo::NiceClass::and_a_method"""
-   let (output, code) = gorge_ex "nim cpp -r tests/example.nim tests/input.cpp"
+   let src = "tests"/"example.nim"
+   let input = "tests"/"input.cpp"
+   var (output, code) = gorge_ex("nim cpp -r --list_cmd " & src & " " & input)
+   output.strip_line_end()
    if code != 0 or not output.ends_with(expected_output):
-      quit("tests failed with code '" & $code & "' and output:\n" & output, 1)
+      raise newException(Defect, "tests failed with code '" & $code &
+                                 "' and output:\n" & output)
    else:
       echo "Tests successful"

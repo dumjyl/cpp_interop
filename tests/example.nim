@@ -12,4 +12,4 @@ proc run(src: c_string): bool
 let src = read_file(param_str(1))
 
 if not run(src):
-  quit(1)
+  quit("clang tooling failed", 1)

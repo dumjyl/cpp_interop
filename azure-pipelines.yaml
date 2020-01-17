@@ -1,0 +1,89 @@
+trigger:
+- master
+
+pr:
+- master
+
+strategy:
+  matrix:
+    ubuntu_16_04:
+      img: 'ubuntu-16.04'
+      LLVM_CLANG_URL: 'http://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
+      LLVM_CLANG_NAME: 'clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04'
+    ubuntu_18_04:
+      img: 'ubuntu-18.04'
+      LLVM_CLANG_URL: 'http://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz'
+      LLVM_CLANG_NAME: 'clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04'
+    macOS_10_14:
+      img: 'macOS-10.14'
+      LLVM_CLANG_URL: 'http://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-darwin-apple.tar.xz'
+      LLVM_CLANG_NAME: 'clang+llvm-9.0.0-x86_64-darwin-apple'
+    windows_2019:
+      img: 'windows-2019'
+      LLVM_CLANG_URL: 'https://github.com/dumjyl/clang-tooling-binaries/releases/download/0.1.0/clang-tooling-9.0.0-win64-mingw.zip'
+      LLVM_CLANG_NAME: 'clang-tooling-9.0.0-win64-mingw'
+
+pool:
+  vmImage: $(img)
+
+steps:
+- bash: |
+    curl -L "${LLVM_CLANG_URL}" -o "${LLVM_CLANG_NAME}.tar.xz"
+    tar -xf "${LLVM_CLANG_NAME}.tar.xz"
+  displayName: 'Unix: Install LLVM and clang'
+  condition: ne(variables['Agent.OS'], 'Windows_NT')
+
+- bash: |
+    curl -L "${LLVM_CLANG_URL}" -o "${LLVM_CLANG_NAME}.zip"
+    unzip -q "${LLVM_CLANG_NAME}.zip"
+  displayName: 'Windows: Install LLVM and clang'
+  condition: eq(variables['Agent.OS'], 'Windows_NT')
+
+- bash: sudo installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg -target /
+  condition: eq(variables['Agent.OS'], 'Darwin')
+  displayName: 'MacOS: Install headers'
+
+- bash: |
+    git clone https://github.com/nim-lang/Nim
+    pushd Nim
+    git clone --depth 1 https://github.com/nim-lang/csources.git
+    ncpu=
+      case '$(Agent.OS)' in
+      'Linux')
+        ncpu=$(nproc)
+        ;;
+      'Darwin')
+        ncpu=$(sysctl -n hw.ncpu)
+        ;;
+      'Windows_NT')
+        ncpu=$NUMBER_OF_PROCESSORS
+        ;;
+      esac
+      [[ -z "$ncpu" || $ncpu -le 0 ]] && ncpu=1
+    make -C csources -j $ncpu CC=gcc
+    cp bin/nim bin/nim_csources
+    bin/nim c --skipUserCfg --skipParentCfg koch
+    ./koch boot -d:danger
+    ./koch nimble
+    popd
+  displayName: 'Install Nim'
+
+- bash: |
+    echo "##vso[task.prependpath]$PWD/${LLVM_CLANG_NAME}/bin"
+    echo "##vso[task.prependpath]$PWD/Nim/bin"
+  displayName: 'Unix: Setup evironment'
+  condition: ne(variables['Agent.OS'], 'Windows_NT')
+
+- powershell: |
+    echo "##vso[task.prependpath]$pwd\$(LLVM_CLANG_NAME)\bin"
+    echo "##vso[task.prependpath]$pwd\Nim\bin"
+  condition: eq(variables['Agent.OS'], 'Windows_NT')
+  displayName: 'Windows: Setup evironment'
+
+- bash: |
+    echo "PATH=${PATH}"
+    echo LLVM and clang installed to: $(llvm-config --prefix)
+    echo Nim version: $(nim -v)
+    nimble install -d -y
+    nimble test
+  displayName: 'Run tests'

@@ -1,7 +1,7 @@
 import
    pkg/std_ext,
    pkg/std_ext/[build,
-                options,
+                str_utils,
                 os]
 from macros import error
 export link
@@ -33,28 +33,36 @@ const
       "LLVMSupport",
       "LLVMDemangle"]
 
-#proc find_exe_opt(exe: string): Opt[string] =
-#   let exe = find_exe(exe)
-#   if exe.len == 0:
-#      result = none(string)
-#   else:
-#      result = some(exe)
+proc valid_config(exe: string): bool =
+   var (output, code) = gorge_ex(exe & " --version")
+   output.strip_line_end()
+   result = code == 0 and output.starts_with("9.0.")
 
 proc config(arg: string): string =
-   let config_exe = anon:
-      # XXX: can't use find_exe at compile time.
-      #if find_exe("clang-frontend-config") as some(clang_frontend_cfg):
-      #   result = clang_frontend_cfg
-      #elif find_exe("llvm-config") as some(llvm_cfg):
-      #   result = llvm_cfg
-      #else:
-      #   error("Cannot find suitable configuration executable")
-      "llvm-config"
-   result = static_exec(config_exe & " --" & arg)
+   let exe = anon:
+      if valid_config("clang-tooling-config"):
+         result = "clang-tooling-config"
+      elif valid_config("llvm-config"):
+         result = "llvm-config"
+      else:
+         error("failed to find valid llvm-config")
+   let (output, code) = gorge_ex(exe & " --" & arg)
+   if code != 0 or output.len == 0:
+      if output.len == 0:
+         error(exe & " failed with code '" & $code & "' and no output")
+      else:
+         error(exe & " failed with code '" & $code & "' and output:\n" &
+               output)
+   else:
+      result = output
+      result.strip_line_end()
 
 template flags* =
    {.pass_c: config"cxxflags".}
    {.pass_c: "-fexceptions".}
    link(clang_libs & llvm_libs)
+   when defined(windows):
+      link("shlwapi")
+      link("version")
    {.pass_l: config"ldflags".}
    {.pass_l: config"system-libs".}
