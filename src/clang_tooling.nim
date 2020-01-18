@@ -43,47 +43,47 @@ type
   RecursiveASTVisitor*[T] {.import_cpp: "clang::RecursiveASTVisitor<'0>",
                             header: "clang/AST/RecursiveASTVisitor.h",
                             inheritable.} = object
-  ASTUnit*{.importcpp: "clang::ASTUnit", header: unitH.} = object
-  ASTContext*{.importcpp: "clang::ASTContext", header: ctxH.} = object
+  ASTUnit*{.import_cpp: "clang::ASTUnit", header: unitH.} = object
+  ASTContext*{.import_cpp: "clang::ASTContext", header: ctxH.} = object
 
   DeclContext* {.import_cpp: "clang::DeclContext",
                  header: "clang/AST/DeclBase.h".} = object
 
   # --- Decls ---
 
-  Decl*{.importcpp: "clang::Decl", header: declH.} = object of RootObj
+  Decl*{.import_cpp: "clang::Decl", header: declH.} = object of RootObj
   TranslationUnitDecl* {.import_cpp: "clang::TranslationUnitDecl",
                          header: "clang/AST/Decl.h".} = object of Decl
-  NamedDecl*{.importcpp: "clang::NamedDecl", header: declH.} = object of Decl
-  ValueDecl*{.importcpp: "clang::ValueDecl",
+  NamedDecl*{.import_cpp: "clang::NamedDecl", header: declH.} = object of Decl
+  ValueDecl*{.import_cpp: "clang::ValueDecl",
               header: declH.} = object of NamedDecl
-  DeclaratorDecl*{.importcpp: "clang::DeclaratorDecl",
+  DeclaratorDecl*{.import_cpp: "clang::DeclaratorDecl",
                    header: declH.} = object of ValueDecl
-  TypeDecl*{.importcpp: "clang::TypeDecl", header: declH.} = object of NamedDecl
-  TemplateDecl*{.importcpp: "clang::TemplateDecl",
+  TypeDecl*{.import_cpp: "clang::TypeDecl", header: declH.} = object of NamedDecl
+  TemplateDecl*{.import_cpp: "clang::TemplateDecl",
                  header: declTmplH.} = object of NamedDecl
-  RedeclarableTemplateDecl*{.importcpp: "clang::RedeclarableTemplateDecl",
+  RedeclarableTemplateDecl*{.import_cpp: "clang::RedeclarableTemplateDecl",
                              header: declTmplH.} = object of TemplateDecl
-  ClassTemplateDecl*{.importcpp: "clang::ClassTemplateDecl",
+  ClassTemplateDecl*{.import_cpp: "clang::ClassTemplateDecl",
                       header: declTmplH.} = object of RedeclarableTemplateDecl
-  FunctionTemplateDecl*{.importcpp: "clang::FunctionTemplateDecl",
+  FunctionTemplateDecl*{.import_cpp: "clang::FunctionTemplateDecl",
                          header: declTmplH.} = object of RedeclarableTemplateDecl
-  TagDecl*{.importcpp: "clang::TagDecl",
+  TagDecl*{.import_cpp: "clang::TagDecl",
             header: declH.} = object of TypeDecl
-  RecordDecl*{.importcpp: "clang::RecordDecl",
+  RecordDecl*{.import_cpp: "clang::RecordDecl",
                header: declH.} = object of TagDecl
-  EnumDecl*{.importcpp: "clang::EnumDecl", header: declH.} = object of TagDecl
-  EnumConstantDecl*{.importcpp: "clang::EnumConstantDecl",
+  EnumDecl*{.import_cpp: "clang::EnumDecl", header: declH.} = object of TagDecl
+  EnumConstantDecl*{.import_cpp: "clang::EnumConstantDecl",
                      header: declH.} = object of ValueDecl
-  CXXRecordDecl*{.importcpp: "clang::CXXRecordDecl",
+  CXXRecordDecl*{.import_cpp: "clang::CXXRecordDecl",
                   header: declCXXH.} = object of RecordDecl
-  FieldDecl*{.importcpp: "clang::FieldDecl",
+  FieldDecl*{.import_cpp: "clang::FieldDecl",
               header: declH.} = object of DeclaratorDecl
-  TypedefNameDecl*{.importcpp: "clang::TypedefNameDecl",
+  TypedefNameDecl*{.import_cpp: "clang::TypedefNameDecl",
                     header: declH.} = object of TypeDecl
-  VarDecl*{.importcpp: "clang::VarDecl",
+  VarDecl*{.import_cpp: "clang::VarDecl",
             header: declH.} = object of DeclaratorDecl
-  FunctionDecl*{.importcpp: "clang::FunctionDecl",
+  FunctionDecl*{.import_cpp: "clang::FunctionDecl",
                  header: declH.} = object of DeclaratorDecl
   CXXMethodDecl*{.import_cpp: "clang::CXXMethodDecl",
                   header: declCxxH.} = object of FunctionDecl
@@ -93,7 +93,7 @@ type
                        header: declCxxH.} = object of CXXMethodDecl
   CXXDestructorDecl* {.import_cpp: "clang::CXXDestructorDecl",
                        header: declCxxH.} = object of CXXMethodDecl
-  ParmVarDecl*{.importcpp: "clang::ParmVarDecl",
+  ParmVarDecl*{.import_cpp: "clang::ParmVarDecl",
                 header: declH.} = object of VarDecl
   NamespaceDecl*{.import_cpp: "clang::NamespaceDecl",
                   header: declH.} = object of NamedDecl
@@ -106,48 +106,48 @@ type
 
   # --- Decl Helpers ---
 
-  DeclarationName*{.importcpp: "clang::DeclarationName",
+  DeclarationName*{.import_cpp: "clang::DeclarationName",
                     header: declNameH.} = object
-  IdentifierInfo*{.importcpp: "clang::IdentifierInfo",
+  IdentifierInfo*{.import_cpp: "clang::IdentifierInfo",
                    header: idTableH.} = object
-  TemplateParameterList*{.importcpp: "clang::TemplateParameterList",
+  TemplateParameterList*{.import_cpp: "clang::TemplateParameterList",
                         header: declTmplH.} = object
-  DeclIterator*[T]{.importcpp: "clang::DeclContext::specific_decl_iterator<'0>",
+  DeclIterator*[T]{.import_cpp: "clang::DeclContext::specific_decl_iterator<'0>",
                     header: declBaseH.} = object
 
   # --- Types ---
 
-  Type*{.importcpp: "clang::Type", header: typeH.} = object of RootObj
-  QualType*{.importcpp: "clang::QualType", header: typeH.} = object
-  BuiltinType*{.importcpp: "clang::BuiltinType",
+  Type*{.import_cpp: "clang::Type", header: typeH.} = object of RootObj
+  QualType*{.import_cpp: "clang::QualType", header: typeH.} = object
+  BuiltinType*{.import_cpp: "clang::BuiltinType",
                 header: typeH.} = object of Type
-  PointerType*{.importcpp: "clang::PointerType",
+  PointerType*{.import_cpp: "clang::PointerType",
                 header: typeH.} = object of Type
-  ArrayType*{.importcpp: "clang::ArrayType", header: typeH.} = object of Type
-  ConstantArrayType*{.importcpp: "clang::ConstantArrayType",
+  ArrayType*{.import_cpp: "clang::ArrayType", header: typeH.} = object of Type
+  ConstantArrayType*{.import_cpp: "clang::ConstantArrayType",
                       header: typeH.} = object of ArrayType
-  IncompleteArrayType*{.importcpp: "clang::IncompleteArrayType",
+  IncompleteArrayType*{.import_cpp: "clang::IncompleteArrayType",
                         header: typeH.} = object of ArrayType
-  TypeWithKeyword*{.importcpp: "clang::TypeWithKeyword",
+  TypeWithKeyword*{.import_cpp: "clang::TypeWithKeyword",
                     header: typeH.} = object of Type
-  ElaboratedType*{.importcpp: "clang::ElaboratedType",
+  ElaboratedType*{.import_cpp: "clang::ElaboratedType",
                    header: typeH.} = object of TypeWithKeyword
-  TypedefType*{.importcpp: "clang::TypedefType",
+  TypedefType*{.import_cpp: "clang::TypedefType",
                 header: typeH.} = object of Type
-  TagType*{.importcpp: "clang::TagType", header: typeH.} = object of Type
-  RecordType*{.importcpp: "clang::RecordType",
+  TagType*{.import_cpp: "clang::TagType", header: typeH.} = object of Type
+  RecordType*{.import_cpp: "clang::RecordType",
                header: typeH.} = object of TagType
-  EnumType*{.importcpp: "clang::EnumType", header: typeH.} = object of TagType
-  ParenType*{.importcpp: "clang::ParenType", header: typeH.} = object of Type
-  FunctionType*{.importcpp: "clang::FunctionType",
+  EnumType*{.import_cpp: "clang::EnumType", header: typeH.} = object of TagType
+  ParenType*{.import_cpp: "clang::ParenType", header: typeH.} = object of Type
+  FunctionType*{.import_cpp: "clang::FunctionType",
                  header: typeH.} = object of Type
-  FunctionProtoType*{.importcpp: "clang::FunctionProtoType",
+  FunctionProtoType*{.import_cpp: "clang::FunctionProtoType",
                       header: typeH.} = object of FunctionType
-  FunctionNoProtoType*{.importcpp: "clang::FunctionNoProtoType",
+  FunctionNoProtoType*{.import_cpp: "clang::FunctionNoProtoType",
                         header: typeH.} = object of FunctionType
-  AdjustedType*{.importcpp: "clang::AdjustedType",
+  AdjustedType*{.import_cpp: "clang::AdjustedType",
                  header: typeH.} = object of Type
-  DecayedType*{.importcpp: "clang::DecayedType",
+  DecayedType*{.import_cpp: "clang::DecayedType",
                 header: typeH.} = object of AdjustedType
   ReferenceType*{.import_cpp: "clang::ReferenceType",
                   header: typeH.} = object of Type
@@ -192,7 +192,7 @@ type
 
   # --- Exprs ---
 
-  Expr*{.importcpp: "clang::Expr", header: exprH.} = object
+  Expr*{.import_cpp: "clang::Expr", header: exprH.} = object
 
 proc get_ASTContext*(self: CompilerInstance): var ASTContext
   {.import_cpp: "getASTContext", header: "clang/Frontend/CompilerInstance.h".}
@@ -202,57 +202,57 @@ proc get_TranslationUnitDecl*(self: ASTContext): ptr TranslationUnitDecl
 
 # --- ASTUnit ---
 
-proc getASTContext*(this: ASTUnit): ASTContext
-  {.importcpp: "getASTContext", header: ctxH.}
+proc getASTContext*(self: ASTUnit): ASTContext
+  {.import_cpp: "getASTContext", header: ctxH.}
 
 # --- ASTContext ---
 
 proc get_source_manager*(self: ASTContext): SourceManager
-  {.importcpp: "getSourceManager", header: ctxH.}
+  {.import_cpp: "getSourceManager", header: ctxH.}
 
 # --- Type ---
 
-proc dump*(this: Type)
-  {.importcpp: "dump", header: typeH.}
+proc dump*(self: Type)
+  {.import_cpp: "dump", header: typeH.}
 
-proc getTypeClassName*(this: Type): cstring
-  {.importcpp: "getTypeClassName", header: typeH.}
+proc getTypeClassName*(self: Type): cstring
+  {.import_cpp: "getTypeClassName", header: typeH.}
 
-proc isBuiltinType*(this: Type): bool
-  {.importcpp: "isBuiltinType", header: typeH.}
+proc isBuiltinType*(self: Type): bool
+  {.import_cpp: "isBuiltinType", header: typeH.}
 
-proc isBuiltin*(this: ptr Type): bool =
-  result = isBuiltinType(this[])
+proc isBuiltin*(self: ptr Type): bool =
+  result = isBuiltinType(self[])
 
-proc isPointerType*(this: Type): bool
-  {.importcpp: "isPointerType", header: typeH.}
+proc isPointerType*(self: Type): bool
+  {.import_cpp: "isPointerType", header: typeH.}
 
-proc isPointer*(this: ptr Type): bool =
-  result = isPointerType(this[])
+proc isPointer*(self: ptr Type): bool =
+  result = isPointerType(self[])
 
-proc isArrayType*(this: Type): bool
-  {.importcpp: "isArrayType", header: typeH.}
+proc isArrayType*(self: Type): bool
+  {.import_cpp: "isArrayType", header: typeH.}
 
-proc isArray*(this: ptr Type): bool =
-  result = isArrayType(this[])
+proc isArray*(self: ptr Type): bool =
+  result = isArrayType(self[])
 
-proc isFunctionType*(this: Type): bool
-  {.importcpp: "isFunctionType", header: typeH.}
+proc isFunctionType*(self: Type): bool
+  {.import_cpp: "isFunctionType", header: typeH.}
 
-proc isFunction*(this: ptr Type): bool =
-  result = isFunctionType(this[])
+proc isFunction*(self: ptr Type): bool =
+  result = isFunctionType(self[])
 
-proc isFunctionNoProtoType*(this: Type): bool
-  {.importcpp: "isFunctionNoProtoType", header: typeH.}
+proc isFunctionNoProtoType*(self: Type): bool
+  {.import_cpp: "isFunctionNoProtoType", header: typeH.}
 
-proc isFunctionNoProto*(this: ptr Type): bool =
-  result = isFunctionNoProtoType(this[])
+proc isFunctionNoProto*(self: ptr Type): bool =
+  result = isFunctionNoProtoType(self[])
 
-proc isFunctionProtoType*(this: Type): bool
-  {.importcpp: "isFunctionProtoType", header: typeH.}
+proc isFunctionProtoType*(self: Type): bool
+  {.import_cpp: "isFunctionProtoType", header: typeH.}
 
-proc isFunctionProto*(this: ptr Type): bool =
-  result = isFunctionProtoType(this[])
+proc isFunctionProto*(self: ptr Type): bool =
+  result = isFunctionProtoType(self[])
 
 # --- QualType ---
 
@@ -264,51 +264,51 @@ proc is_null*(self: QualType): bool
 
 # --- BuiltinType ---
 
-proc isInteger*(this: BuiltinType): bool
-  {.importcpp: "isInteger", header: typeH.}
+proc isInteger*(self: BuiltinType): bool
+  {.import_cpp: "isInteger", header: typeH.}
 
-proc isSignedInteger*(this: BuiltinType): bool
-  {.importcpp: "isSignedInteger", header: typeH.}
+proc isSignedInteger*(self: BuiltinType): bool
+  {.import_cpp: "isSignedInteger", header: typeH.}
 
-proc isUnsignedInteger*(this: BuiltinType): bool
-  {.importcpp: "isUnsignedInteger", header: typeH.}
+proc isUnsignedInteger*(self: BuiltinType): bool
+  {.import_cpp: "isUnsignedInteger", header: typeH.}
 
-proc isFloatingPoint*(this: BuiltinType): bool
-  {.importcpp: "isFloatingPoint", header: typeH.}
+proc isFloatingPoint*(self: BuiltinType): bool
+  {.import_cpp: "isFloatingPoint", header: typeH.}
 
-proc isPlaceholderType*(this: BuiltinType): bool
-  {.importcpp: "isPlaceholderType", header: typeH.}
+proc isPlaceholderType*(self: BuiltinType): bool
+  {.import_cpp: "isPlaceholderType", header: typeH.}
 
-proc getNameAsCString*(this: BuiltinType; policy: PrintingPolicy): cstring
-  {.importcpp: "getNameAsCString", header: typeH.}
+proc getNameAsCString*(self: BuiltinType; policy: PrintingPolicy): cstring
+  {.import_cpp: "getNameAsCString", header: typeH.}
 
 # --- PointerType ---
 
-proc getPointeeType*(this: PointerType): QualType
-  {.importcpp: "getPointeeType", header: typeH.}
+proc getPointeeType*(self: PointerType): QualType
+  {.import_cpp: "getPointeeType", header: typeH.}
 
 # -- ArrayType ---
 
-proc get_element_type*(this: ArrayType): QualType
+proc get_element_type*(self: ArrayType): QualType
   {.import_cpp: "getElementType", header: typeH.}
 
 # --- ConstantArrayType ---
 
-proc get_size*(this: ConstantArrayType): APInt
+proc get_size*(self: ConstantArrayType): APInt
   {.import_cpp: "getSize", header: typeH.}
 
 # --- TypeWithKeyword ---
 
-proc getKeyword*(this: TypeWithKeyword): ElaboratedTypeKeyword
-  {.importcpp: "getKeyword", header: typeH.}
+proc getKeyword*(self: TypeWithKeyword): ElaboratedTypeKeyword
+  {.import_cpp: "getKeyword", header: typeH.}
 
 # --- ElaboratedType ---
 
 proc get_named_type*(self: ElaboratedType): QualType
   {.import_cpp: "getNamedType", header: typeH.}
 
-proc getOwnedTagDecl*(this: ElaboratedType): TagDecl
-  {.importcpp: "getOwnedTagDecl", header: typeH.}
+proc getOwnedTagDecl*(self: ElaboratedType): TagDecl
+  {.import_cpp: "getOwnedTagDecl", header: typeH.}
 
 # --- TypedefType ---
 
@@ -316,7 +316,7 @@ proc get_decl*(self: TypedefType): ptr TypedefNameDecl
   {.import_cpp: "#.getDecl(@)", header: typeH.}
 
 proc desugar*(self: TypedefType): QualType
-  {.importcpp: "desugar", header: typeH.}
+  {.import_cpp: "desugar", header: typeH.}
 
 # --- RecordType ---
 
@@ -330,94 +330,94 @@ proc get_decl*(self: EnumType): ptr EnumDecl
 
 # --- ParenType ---
 
-proc getInnerType*(this: ParenType): QualType
-  {.importcpp: "getInnerType", header: typeH.}
+proc getInnerType*(self: ParenType): QualType
+  {.import_cpp: "getInnerType", header: typeH.}
 
 # --- FunctionType ---
 
 proc get_return_type*(self: FunctionType): QualType
-  {.importcpp: "getReturnType", header: typeH.}
+  {.import_cpp: "getReturnType", header: typeH.}
 
 proc get_return_type*(self: ptr FunctionType): ptr Type =
   result = get_return_type(deref self).get_type_ptr()
 
-proc getCallConv*(this: FunctionType): CallingConv
-  {.importcpp: "getCallConv", header: typeH.}
+proc getCallConv*(self: FunctionType): CallingConv
+  {.import_cpp: "getCallConv", header: typeH.}
 
 # --- FunctionProtoType ---
 
-proc getNumParams*(this: FunctionProtoType): cuint
-  {.importcpp: "getNumParams", header: typeH.}
+proc getNumParams*(self: FunctionProtoType): cuint
+  {.import_cpp: "getNumParams", header: typeH.}
 
-proc getParamType*(this: FunctionProtoType, i: cuint): QualType
-  {.importcpp: "getParamType", header: typeH.}
+proc getParamType*(self: FunctionProtoType, i: cuint): QualType
+  {.import_cpp: "getParamType", header: typeH.}
 
-proc paramTyps*(this: ptr FunctionProtoType): seq[ptr Type] =
-  for i in 0 ..< int(getNumParams(this[])):
-    result.add(this[].getParamType(cuint(i)).getTypePtr())
+proc paramTyps*(self: ptr FunctionProtoType): seq[ptr Type] =
+  for i in 0 ..< int(getNumParams(self[])):
+    result.add(self[].getParamType(cuint(i)).getTypePtr())
 
-proc isVariadic*(this: FunctionProtoType): bool
-  {.importcpp: "isVariadic", header: typeH.}
+proc isVariadic*(self: FunctionProtoType): bool
+  {.import_cpp: "isVariadic", header: typeH.}
 
 # --- AdjustedType ---
 
-proc getOriginalType*(this: AdjustedType): QualType
-  {.importcpp: "getOriginalType", header: typeH.}
+proc getOriginalType*(self: AdjustedType): QualType
+  {.import_cpp: "getOriginalType", header: typeH.}
 
-proc getAdjustedType*(this: AdjustedType): QualType
-  {.importcpp: "getAdjustedType", header: typeH.}
+proc getAdjustedType*(self: AdjustedType): QualType
+  {.import_cpp: "getAdjustedType", header: typeH.}
 
 # --- DecayedType ---
 
-proc getDecayedType*(this: DecayedType): QualType
-  {.importcpp: "getDecayedType", header: typeH.}
+proc getDecayedType*(self: DecayedType): QualType
+  {.import_cpp: "getDecayedType", header: typeH.}
 
-proc getPointeeType*(this: DecayedType): QualType
-  {.importcpp: "getPointeeType", header: typeH.}
+proc getPointeeType*(self: DecayedType): QualType
+  {.import_cpp: "getPointeeType", header: typeH.}
 
 # --- DeclarationName ---
 
-proc getAsString*(this: DeclarationName): cpp_string
-  {.importcpp: "getAsString", header: declNameH.}
+proc getAsString*(self: DeclarationName): cpp_string
+  {.import_cpp: "getAsString", header: declNameH.}
 
-proc getAsIdentifierInfo*(this: DeclarationName): ptr IdentifierInfo
-  {.importcpp: "getAsIdentifierInfo", header: declNameH.}
+proc getAsIdentifierInfo*(self: DeclarationName): ptr IdentifierInfo
+  {.import_cpp: "getAsIdentifierInfo", header: declNameH.}
 
-proc isIdentifier*(this: DeclarationName): bool
-  {.importcpp: "isIdentifier", header: declNameH.}
+proc isIdentifier*(self: DeclarationName): bool
+  {.import_cpp: "isIdentifier", header: declNameH.}
 
-proc dump*(this: DeclarationName)
-  {.importcpp: "dump", header: declNameH.}
+proc dump*(self: DeclarationName)
+  {.import_cpp: "dump", header: declNameH.}
 
 # --- IdentifierInfo ---
 
-proc getName*(this: IdentifierInfo): StringRef
-  {.importcpp: "getName", header: idTableH.}
+proc getName*(self: IdentifierInfo): StringRef
+  {.import_cpp: "getName", header: idTableH.}
 
-proc getBuiltinID*(this: IdentifierInfo): c_uint
-  {.importcpp: "getBuiltinID", header: idTableH.}
+proc getBuiltinID*(self: IdentifierInfo): c_uint
+  {.import_cpp: "getBuiltinID", header: idTableH.}
 
 # --- Decl ---
 
-proc getDeclKindName*(this: Decl): cstring
-  {.importcpp: "getDeclKindName", header: declH.}
+proc getDeclKindName*(self: Decl): cstring
+  {.import_cpp: "getDeclKindName", header: declH.}
 
-proc getCanonicalDecl*(this: Decl): ptr Decl
-  {.importcpp: "getCanonicalDecl", header: declH.}
+proc getCanonicalDecl*(self: Decl): ptr Decl
+  {.import_cpp: "getCanonicalDecl", header: declH.}
 
-proc getNextDeclInContext*(this: Decl): ptr Decl
-  {.importcpp: "getNextDeclInContext", header: declH.}
+proc getNextDeclInContext*(self: Decl): ptr Decl
+  {.import_cpp: "getNextDeclInContext", header: declH.}
 
-proc canon*(this: ptr Decl): ptr Decl =
-  result = getCanonicalDecl(this[])
+proc canon*(self: ptr Decl): ptr Decl =
+  result = getCanonicalDecl(self[])
 
 proc dumpColor*(self: Decl)
-  {.importcpp: "dumpColor", header: declH.}
+  {.import_cpp: "dumpColor", header: declH.}
 
 proc dump*(self: Decl)
-  {.importcpp: "dump", header: declH.}
+  {.import_cpp: "dump", header: declH.}
 
-proc get_location*(this: Decl): SourceLocation
+proc get_location*(self: Decl): SourceLocation
   {.import_cpp: "#.getLocation(@)", header: declH.}
 
 # --- NamedDecl ---
@@ -428,11 +428,11 @@ proc get_name_as_string*(self: NamedDecl): cpp_string
 proc get_qualified_name_as_string*(self: NamedDecl): cpp_string
   {.import_cpp: "#.getQualifiedNameAsString(@)", header: declH.}
 
-proc getDeclName*(this: NamedDecl): DeclarationName
-  {.importcpp: "getDeclName", header: declH.}
+proc getDeclName*(self: NamedDecl): DeclarationName
+  {.import_cpp: "getDeclName", header: declH.}
 
-# proc getName*(this: ptr NamedDecl): string =
-#   let declName = getDeclName(this[])
+# proc getName*(self: ptr NamedDecl): string =
+#   let declName = getDeclName(self[])
 #   let identInfo = declName.getAsIdentifierInfo()
 #   if identInfo != nil:
 #     result = $getName(identInfo[])
@@ -443,7 +443,7 @@ proc getDeclName*(this: NamedDecl): DeclarationName
 #   # echo isIdentifier
 #     # result = $getName(identInfo[]).str().cStr()
 
-#   # result = $cStr(getAsString(getDeclName(this[])))
+#   # result = $cStr(getAsString(getDeclName(self[])))
 
 proc name*(self: ptr NamedDecl): string =
   result = $self.deref.get_name_as_string()
@@ -454,13 +454,13 @@ proc qualified_name*(self: ptr NamedDecl): string =
 
 # --- ValueDecl ---
 
-proc getType*(this: ValueDecl): QualType
-  {.importcpp: "getType", header: declH.}
+proc getType*(self: ValueDecl): QualType
+  {.import_cpp: "getType", header: declH.}
 
 # --- TypeDecl ---
 
-proc getTypeForDecl*(this: TypeDecl): ptr Type
-  {.importcpp: "getTypeForDecl", header: declH.}
+proc getTypeForDecl*(self: TypeDecl): ptr Type
+  {.import_cpp: "getTypeForDecl", header: declH.}
 
 # --- TemplateDecl ---
 
@@ -470,11 +470,11 @@ proc getTypeForDecl*(this: TypeDecl): ptr Type
 #    raise newException(Defect, "cannot get TemplateDecl from cursor")
 #  result = cast[ptr TemplateDecl](c.data[cdkDecl])
 
-proc getTemplatedDecl*(this: TemplateDecl): ptr NamedDecl
-  {.importcpp: "getTemplatedDecl", header: declTmplH.}
+proc getTemplatedDecl*(self: TemplateDecl): ptr NamedDecl
+  {.import_cpp: "getTemplatedDecl", header: declTmplH.}
 
-proc getTemplateParameters*(this: TemplateDecl): ptr TemplateParameterList
-  {.importcpp: "getTemplateParameters", header: declTmplH.}
+proc getTemplateParameters*(self: TemplateDecl): ptr TemplateParameterList
+  {.import_cpp: "getTemplateParameters", header: declTmplH.}
 
 # --- TemplateParameterList ---
 
@@ -490,39 +490,39 @@ iterator items*(self: ptr TemplateParameterList): ptr NamedDecl =
 
 # --- specific_decl_iterator ---
 
-proc inc*[T](this: DeclIterator[T])
-  {.importcpp: "#.operator++(@)", header: declBaseH.}
+proc inc*[T](self: DeclIterator[T])
+  {.import_cpp: "#.operator++(@)", header: declBaseH.}
 
 proc `==`*[T](x, y: DeclIterator[T]): bool
-  {.importcpp: "operator==(@)", header: declBaseH.}
+  {.import_cpp: "operator==(@)", header: declBaseH.}
 
-proc cur*[T](this: DeclIterator[T]): ptr T
-  {.importcpp: "#.operator*(@)", header: declBaseH.}
+proc cur*[T](self: DeclIterator[T]): ptr T
+  {.import_cpp: "#.operator*(@)", header: declBaseH.}
 
 # --- TypedefNameDecl ---
 
-# proc getCanonicalDecl*(this: TypedefNameDecl): ptr TypedefNameDecl
-  # {.importcpp: "getCanonicalDecl", header: declH.}
+# proc getCanonicalDecl*(self: TypedefNameDecl): ptr TypedefNameDecl
+  # {.import_cpp: "getCanonicalDecl", header: declH.}
 
-proc getUnderlyingType*(this: TypedefNameDecl): QualType
-  {.importcpp: "getUnderlyingType", header: declH.}
+proc getUnderlyingType*(self: TypedefNameDecl): QualType
+  {.import_cpp: "getUnderlyingType", header: declH.}
 
 # --- TagDecl ---
 
-proc isStruct*(this: TagDecl): bool
-  {.importcpp: "isStruct", header: declH.}
+proc isStruct*(self: TagDecl): bool
+  {.import_cpp: "isStruct", header: declH.}
 
-proc isInterface*(this: TagDecl): bool
-  {.importcpp: "isInterface", header: declH.}
+proc isInterface*(self: TagDecl): bool
+  {.import_cpp: "isInterface", header: declH.}
 
-proc isClass*(this: TagDecl): bool
-  {.importcpp: "isClass", header: declH.}
+proc isClass*(self: TagDecl): bool
+  {.import_cpp: "isClass", header: declH.}
 
-proc isUnion*(this: TagDecl): bool
-  {.importcpp: "isUnion", header: declH.}
+proc isUnion*(self: TagDecl): bool
+  {.import_cpp: "isUnion", header: declH.}
 
-proc isEnum*(this: TagDecl): bool
-  {.importcpp: "isEnum", header: declH.}
+proc isEnum*(self: TagDecl): bool
+  {.import_cpp: "isEnum", header: declH.}
 
 # --- RecordDecl ---
 
@@ -546,33 +546,33 @@ iterator record_fields*(decl: ptr RecordDecl): ptr FieldDecl =
 
 # --- EnumDecl ---
 
-proc enumFieldsBegin*(this: EnumDecl): DeclIterator[EnumConstantDecl]
-  {.importcpp: "enumerator_begin", header: declH.}
+proc enumFieldsBegin*(self: EnumDecl): DeclIterator[EnumConstantDecl]
+  {.import_cpp: "enumerator_begin", header: declH.}
 
-proc enumFieldsEnd*(this: EnumDecl): DeclIterator[EnumConstantDecl]
-  {.importcpp: "enumerator_end", header: declH.}
+proc enumFieldsEnd*(self: EnumDecl): DeclIterator[EnumConstantDecl]
+  {.import_cpp: "enumerator_end", header: declH.}
 
-iterator enumFields*(this: ptr EnumDecl): ptr EnumConstantDecl =
-  var fieldIter = enumFieldsBegin(this[])
-  while fieldIter != enumFieldsEnd(this[]):
+iterator enumFields*(self: ptr EnumDecl): ptr EnumConstantDecl =
+  var fieldIter = enumFieldsBegin(self[])
+  while fieldIter != enumFieldsEnd(self[]):
     yield cur(fieldIter)
     inc(fieldIter)
 
 # --- EnumConstantDecl ---
 
-proc getInitVal*(this: EnumConstantDecl): APSInt
-  {.importcpp: "getInitVal", header: declH.}
+proc getInitVal*(self: EnumConstantDecl): APSInt
+  {.import_cpp: "getInitVal", header: declH.}
 
-proc enumVal*(this: ptr EnumConstantDecl): int64 =
-  result = getInitVal(this[]).getExtValue()
+proc enumVal*(self: ptr EnumConstantDecl): int64 =
+  result = getInitVal(self[]).getExtValue()
 
 # --- FieldDecl ---
 
-proc isBitField*(this: FieldDecl): bool
-  {.importcpp: "isBitField", header: declH.}
+proc isBitField*(self: FieldDecl): bool
+  {.import_cpp: "isBitField", header: declH.}
 
-proc getBitWidthValue*(this: FieldDecl; astCtx: ASTContext): cuint
-  {.importcpp: "getBitWidthValue", header: declH.}
+proc getBitWidthValue*(self: FieldDecl; astCtx: ASTContext): cuint
+  {.import_cpp: "getBitWidthValue", header: declH.}
 
 # --- FunctionDecl ---
 
@@ -598,8 +598,8 @@ proc is_static*(self: FunctionDecl): bool
 proc is_variadic*(self: FunctionDecl): bool
   {.import_cpp: "isVariadic", header: declH.}
 
-proc getCallConv*(this: ptr FunctionDecl): CallingConv =
-  var funcTyp = getType(this[]).getTypePtr
+proc getCallConv*(self: ptr FunctionDecl): CallingConv =
+  var funcTyp = getType(self[]).getTypePtr
   assert(funcTyp.isA(FunctionProtoType))
   result = cast[ptr FunctionProtoType](funcTyp)[].getCallConv
 
@@ -739,14 +739,14 @@ type
 const
   srcMgrH = "clang/Basic/SourceManager.h"
 
-proc get_file*(this: SourceManager; loc: SourceLocation): StringRef
-  {.importcpp: "getFilename", header: srcMgrH.}
+proc get_file*(self: SourceManager; loc: SourceLocation): StringRef
+  {.import_cpp: "getFilename", header: srcMgrH.}
 
-proc get_col*(this: SourceManager, loc: SourceLocation): c_uint
-  {.importcpp: "getSpellingColumnNumber", header: srcMgrH.}
+proc get_col*(self: SourceManager, loc: SourceLocation): c_uint
+  {.import_cpp: "getSpellingColumnNumber", header: srcMgrH.}
 
-proc get_line*(this: SourceManager, loc: SourceLocation): c_uint
-  {.importcpp: "getSpellingLineNumber", header: srcMgrH.}
+proc get_line*(self: SourceManager, loc: SourceLocation): c_uint
+  {.import_cpp: "getSpellingLineNumber", header: srcMgrH.}
 
 template src_manager(ast_ctx: ptr ASTContext): SourceManager =
   ast_ctx[].get_source_manager()
