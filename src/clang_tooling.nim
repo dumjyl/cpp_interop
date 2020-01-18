@@ -117,14 +117,14 @@ type
 
   # --- Types ---
 
-  Type*{.import_cpp: "clang::Type", header: typeH.} = object of RootObj
+  Type*{.import_cpp: "const clang::Type", header: typeH.} = object of RootObj
   QualType*{.import_cpp: "clang::QualType", header: typeH.} = object
-  BuiltinType*{.import_cpp: "clang::BuiltinType",
+  BuiltinType*{.import_cpp: "const clang::BuiltinType",
                 header: typeH.} = object of Type
   PointerType*{.import_cpp: "clang::PointerType",
                 header: typeH.} = object of Type
-  ArrayType*{.import_cpp: "clang::ArrayType", header: typeH.} = object of Type
-  ConstantArrayType*{.import_cpp: "clang::ConstantArrayType",
+  ArrayType*{.import_cpp: "const clang::ArrayType", header: typeH.} = object of Type
+  ConstantArrayType*{.import_cpp: "const clang::ConstantArrayType",
                       header: typeH.} = object of ArrayType
   IncompleteArrayType*{.import_cpp: "clang::IncompleteArrayType",
                         header: typeH.} = object of ArrayType
@@ -339,6 +339,7 @@ proc get_return_type*(self: FunctionType): QualType
   {.import_cpp: "getReturnType", header: typeH.}
 
 proc get_return_type*(self: ptr FunctionType): ptr Type =
+  # XXX: This causes issues with clang due to constness
   result = get_return_type(deref self).get_type_ptr()
 
 proc getCallConv*(self: FunctionType): CallingConv
@@ -448,19 +449,18 @@ proc getDeclName*(self: NamedDecl): DeclarationName
 proc name*(self: ptr NamedDecl): string =
   result = $self.deref.get_name_as_string()
 
-
 proc qualified_name*(self: ptr NamedDecl): string =
   result = $self.deref.get_qualified_name_as_string()
 
 # --- ValueDecl ---
 
-proc getType*(self: ValueDecl): QualType
-  {.import_cpp: "getType", header: declH.}
+proc get_type*(self: ValueDecl): QualType
+  {.import_cpp: "#.getType(@)", header: declH.}
 
 # --- TypeDecl ---
 
-proc getTypeForDecl*(self: TypeDecl): ptr Type
-  {.import_cpp: "getTypeForDecl", header: declH.}
+proc get_type_for_decl*(self: TypeDecl): ptr Type
+  {.import_cpp: "#.getTypeForDecl(@)", header: declH.}
 
 # --- TemplateDecl ---
 
@@ -470,11 +470,11 @@ proc getTypeForDecl*(self: TypeDecl): ptr Type
 #    raise newException(Defect, "cannot get TemplateDecl from cursor")
 #  result = cast[ptr TemplateDecl](c.data[cdkDecl])
 
-proc getTemplatedDecl*(self: TemplateDecl): ptr NamedDecl
-  {.import_cpp: "getTemplatedDecl", header: declTmplH.}
+proc get_templated_decl*(self: TemplateDecl): ptr NamedDecl
+  {.import_cpp: "#.getTemplatedDecl(@)", header: declTmplH.}
 
-proc getTemplateParameters*(self: TemplateDecl): ptr TemplateParameterList
-  {.import_cpp: "getTemplateParameters", header: declTmplH.}
+proc get_template_parameters*(self: TemplateDecl): ptr TemplateParameterList
+  {.import_cpp: "#.getTemplateParameters(@)", header: declTmplH.}
 
 # --- TemplateParameterList ---
 
@@ -524,6 +524,9 @@ proc isUnion*(self: TagDecl): bool
 proc isEnum*(self: TagDecl): bool
   {.import_cpp: "isEnum", header: declH.}
 
+proc get_definition*(self: TagDecl): ptr TagDecl
+  {.import_cpp: "#.getDefinition(@)", header: declH.}
+
 # --- RecordDecl ---
 
 proc field_begin*(self: RecordDecl): DeclIterator[FieldDecl]
@@ -543,6 +546,9 @@ iterator record_fields*(decl: ptr RecordDecl): ptr FieldDecl =
   while field_iter != field_end(deref decl):
     yield cur(field_iter)
     inc(field_iter)
+
+proc get_definition*(self: RecordDecl): ptr RecordDecl
+  {.import_cpp: "#.getDefinition(@)", header: declH.}
 
 # --- EnumDecl ---
 
@@ -776,6 +782,9 @@ iterator bases*(self: ptr CXXRecordDecl): ptr CXXBaseSpecifier =
   while cur != bases.`end`:
     yield cur
     cur = cur.offset(1)
+
+proc get_definition*(self: CXXRecordDecl): ptr CXXRecordDecl
+  {.import_cpp: "#.getDefinition(@)", header: declH.}
 
 type AccessSpecifier* = enum as_public, as_protected, as_private, as_none
 
