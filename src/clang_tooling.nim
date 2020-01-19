@@ -121,7 +121,7 @@ type
   QualType*{.import_cpp: "clang::QualType", header: typeH.} = object
   BuiltinType*{.import_cpp: "const clang::BuiltinType",
                 header: typeH.} = object of Type
-  PointerType*{.import_cpp: "clang::PointerType",
+  PointerType*{.import_cpp: "const clang::PointerType",
                 header: typeH.} = object of Type
   ArrayType*{.import_cpp: "const clang::ArrayType", header: typeH.} = object of Type
   ConstantArrayType*{.import_cpp: "const clang::ConstantArrayType",
@@ -130,11 +130,11 @@ type
                         header: typeH.} = object of ArrayType
   TypeWithKeyword*{.import_cpp: "clang::TypeWithKeyword",
                     header: typeH.} = object of Type
-  ElaboratedType*{.import_cpp: "clang::ElaboratedType",
+  ElaboratedType*{.import_cpp: "const clang::ElaboratedType",
                    header: typeH.} = object of TypeWithKeyword
-  TypedefType*{.import_cpp: "clang::TypedefType",
+  TypedefType*{.import_cpp: "const clang::TypedefType",
                 header: typeH.} = object of Type
-  TagType*{.import_cpp: "clang::TagType", header: typeH.} = object of Type
+  TagType*{.import_cpp: "const clang::TagType", header: typeH.} = object of Type
   RecordType*{.import_cpp: "clang::RecordType",
                header: typeH.} = object of TagType
   EnumType*{.import_cpp: "clang::EnumType", header: typeH.} = object of TagType
@@ -149,9 +149,9 @@ type
                  header: typeH.} = object of Type
   DecayedType*{.import_cpp: "clang::DecayedType",
                 header: typeH.} = object of AdjustedType
-  ReferenceType*{.import_cpp: "clang::ReferenceType",
+  ReferenceType*{.import_cpp: "const clang::ReferenceType",
                   header: typeH.} = object of Type
-  TemplateTypeParmType*{.import_cpp: "clang::TemplateTypeParmType",
+  TemplateTypeParmType*{.import_cpp: "const clang::TemplateTypeParmType",
                          header: typeH.} = object of Type
   InjectedClassNameType*{.import_cpp: "clang::InjectedClassNameType",
                           header: typeH.} = object of Type
@@ -159,6 +159,8 @@ type
                                header: typeH.} = object of Type
   TemplateName* {.import_cpp: "clang::TemplateName",
                   header: "clang/AST/TemplateName.h".} = object
+  DecltypeType* {.import_cpp: "const clang::DecltypeType",
+                  header: "clang/AST/Type.h".} = object
 
   # --- Type Helpers ---
 
@@ -226,6 +228,9 @@ proc isBuiltin*(self: ptr Type): bool =
 
 proc isPointerType*(self: Type): bool
   {.import_cpp: "isPointerType", header: typeH.}
+
+proc is_void_pointer_type*(self: Type): bool
+  {.import_cpp: "#.isVoidPointerType(@)", header: typeH.}
 
 proc isPointer*(self: ptr Type): bool =
   result = isPointerType(self[])
@@ -821,6 +826,8 @@ template derived_kind(TypeType: type[Type], first, last: TypeClass) =
     result = `TypeType Class`(self.cast_to(Type).get_type_class())
 
 derived_kind(ArrayType, ConstantArray, DependentSizedArray)
+derived_kind(ReferenceType, LValueReference, RValueReference)
+derived_kind(TagType, Record, Enum)
 
 proc get_pointee_type*(self: ReferenceType): QualType
   {.import_cpp: "#.getPointeeType(@)".}
@@ -968,3 +975,9 @@ type
 
 proc get_tag_kind*(self: TagDecl): TagKind
   {.import_cpp: "#.getTagKind(@)".}
+
+proc get_decl*(self: TagType): ptr TagDecl
+  {.import_cpp: "#.getDecl(@)".}
+
+proc get_underlying_type*(self: DecltypeType): QualType
+  {.import_cpp: "#.getUnderlyingType(@)".}
