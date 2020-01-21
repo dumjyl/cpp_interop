@@ -4,5 +4,5 @@ const
 type
   APSInt*{.importcpp: "llvm::APSInt", header: H.} = object
 
-proc getExtValue*(self: APSInt): int64
-  {.importcpp: "getExtValue", header: H.}
+proc get_ext_value*(self: APSInt): int64
+  {.importcpp: "#.getExtValue(@)", header: H.}

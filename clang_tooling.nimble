@@ -1,4 +1,4 @@
-version = "0.4.1"
+version = "0.5.0"
 author= "Jasper Jenkins"
 description = "bindings and stuff for the clang compiler"
 license = "MIT"
