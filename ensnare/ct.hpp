@@ -191,12 +191,14 @@ fn is_cpp_file(const Str& file) -> bool {
 
 namespace cl {
 namespace cl = llvm::cl;
+cl::opt<bool> disable_includes("disable-includes",
+                               cl::desc("do not gather system includes. FIXME: not implimented"));
 cl::opt<Str> name(cl::Positional, cl::desc("wrapper name"));
 cl::list<Str> args(cl::ConsumeAfter, cl::desc("clang args..."));
 } // namespace cl
 
 class Config {
-   NO_COPY(Config);
+   // NO_COPY(Config);
 
    READ_ONLY(Vec<Str>, headers);
    READ_ONLY(Str, name);
@@ -216,61 +218,23 @@ class Config {
 
    // A header file with all the `--header` args added together.
    pub fn header_file() const -> Str {
-      Str result;
-      for (const auto& header : this->_headers) {
-         result += "#include ";
-         if (os::is_system_header(header)) {
-            result += header;
-         } else {
-            result += "\"" + header + "\"";
+      if (this->_headers.size() == 0) {
+         fatal("no headers given");
+      } else {
+         Str result;
+         for (const auto& header : this->_headers) {
+            result += "#include ";
+            if (os::is_system_header(header)) {
+               result += header;
+            } else {
+               result += "\"" + header + "\"";
+            }
+            result += '\n';
          }
-         result += '\n';
-      }
-      return result;
+         return result;
+      };
    }
 };
-
-// Get a suitable location to store temp file.
-fn temp(Str name) -> Str {
-   return os::temp_file("ensnare_system_includes_" + name);
-}
-
-// Get some verbose compiler logs to parse.
-fn get_raw_include_paths() -> Str {
-   os::write_file(temp("test"), ""); // so the compiler does not error.
-   Str cmd = "clang++ -xc++ -c -v " + temp("test") + " 2>&1";
-   return os::successful_process_output(cmd);
-}
-
-// Parse include paths out of some verbose compiler logs.
-fn include_paths() -> Vec<Str> {
-   Vec<Str> result;
-   auto lines = split_newlines(get_raw_include_paths());
-   if (lines.size() == 0) {
-      return result;
-   }
-   auto start = std::find(lines.begin(), lines.end(), "#include <...> search starts here:");
-   auto stop = std::find(lines.begin(), lines.end(), "End of search list.");
-   if (start == lines.end() || stop == lines.end()) {
-      fatal("failed to parse include paths");
-   }
-   for (auto it = start + 1; it != stop; it++) {
-      if (it->size() > 0) {
-         result.push_back("-isystem" + ((*it)[0] == ' ' ? it->substr(1) : *it));
-      }
-   }
-   return result;
-}
-
-// Load a translation unit from user provided arguments with additional include path arguments.
-fn parse_translation_unit(const Config& cfg) -> std::unique_ptr<clang::ASTUnit> {
-   Vec<Str> args = {"-xc++"};
-   auto includes = include_paths();
-   args.insert(args.end(), includes.begin(), includes.end());
-   args.insert(args.end(), cfg.clang_args().begin(), cfg.clang_args().end());
-   return clang::tooling::buildASTFromCodeWithArgs(cfg.header_file(), args, "ensnare_headers.h",
-                                                   "ensnare");
-}
 
 // This is reference counted string class with a history. It should only be used like `Node<Sym`>.
 class Sym {
@@ -285,9 +249,10 @@ class Sym {
 
 class AtomType;
 class PtrType;
+class RefType;
 class OpaqueType;
 
-using Type = Union<AtomType, PtrType, OpaqueType>;
+using Type = Union<AtomType, PtrType, RefType, OpaqueType>;
 
 // An identifier.
 class AtomType {
@@ -298,14 +263,14 @@ class AtomType {
 
 // Just a raw pointer.
 class PtrType {
-   READ_ONLY(Node<Type>, type);
-   pub PtrType(Node<Type> type) : _type(type) {}
+   READ_ONLY(Node<Type>, pointee);
+   pub PtrType(Node<Type> pointee) : _pointee(pointee) {}
 };
 
 // A c++ reference pointer.
-class RefPtrType {
-   READ_ONLY(Node<Type>, type);
-   pub RefPtrType(Node<Type> type) : _type(type) {}
+class RefType {
+   READ_ONLY(Node<Type>, pointee);
+   pub RefType(Node<Type> pointee) : _pointee(pointee) {}
 };
 
 // This class should only come on the right hand side of a AliasTypeDecl.
@@ -316,12 +281,12 @@ class OpaqueType {};
 class AliasTypeDecl {
    READ_ONLY(Node<Sym>, name);
    READ_ONLY(Node<Type>, type);
-   pub AliasTypeDecl(const Str& name, Node<Type> type) : _name(node<Sym>(name)), _type(type) {}
+   pub AliasTypeDecl(const Str name, const Node<Type> type) : _name(node<Sym>(name)), _type(type) {}
 };
 
 class EnumFieldDecl {
    READ_ONLY(Node<Sym>, name);
-   pub EnumFieldDecl(const Str& name) : _name(node<Sym>(name)) {}
+   pub EnumFieldDecl(const Str name) : _name(node<Sym>(name)) {}
 };
 
 // A c++ enum of some kind. It may not be mapped as a nim enum.
@@ -329,7 +294,7 @@ class EnumTypeDecl {
    READ_ONLY(Node<Sym>, name);
    READ_ONLY(Str, cpp_name);
    READ_ONLY(Vec<EnumFieldDecl>, fields);
-   pub EnumTypeDecl(const Str& name, const Str& cpp_name, Vec<EnumFieldDecl> fields)
+   pub EnumTypeDecl(const Str name, const Str cpp_name, const Vec<EnumFieldDecl> fields)
       : _name(node<Sym>(name)), _cpp_name(cpp_name), _fields(fields) {}
 };
 
@@ -337,16 +302,29 @@ class EnumTypeDecl {
 class RecordTypeDecl {
    READ_ONLY(Node<Sym>, name);
    READ_ONLY(Str, cpp_name);
-   pub RecordTypeDecl(const Str& name, const Str& cpp_name)
+   pub RecordTypeDecl(const Str name, const Str cpp_name)
       : _name(node<Sym>(name)), _cpp_name(cpp_name) {}
 };
 
 using TypeDecl = Union<AliasTypeDecl, EnumTypeDecl, RecordTypeDecl>;
 
+class FunctionParamDecl {
+   READ_ONLY(Node<Sym>, name);
+   READ_ONLY(Node<Type>, type);
+   // READ_ONLY(Opt<Node<Expr>>, expr);
+   pub FunctionParamDecl(const Str name, const Node<Type> type)
+      : _name(node<Sym>(name)), _type(type) {}
+};
+
 // A non method function declaration.
 class FreeFunctionDecl {
    READ_ONLY(Node<Sym>, name);
-   pub FreeFunctionDecl(const Str& name) : _name(node<Sym>(name)) {}
+   READ_ONLY(Str, cpp_name);
+   READ_ONLY(Vec<FunctionParamDecl>, formals);
+   READ_ONLY(Opt<Node<Type>>, return_type);
+   pub FreeFunctionDecl(const Str name, const Str cpp_name, const Vec<FunctionParamDecl> formals,
+                        const Opt<Node<Type>> return_type)
+      : _name(node<Sym>(name)), _cpp_name(cpp_name), _formals(formals), _return_type(return_type) {}
 };
 
 using FunctionDecl = Union<FreeFunctionDecl>;
@@ -402,15 +380,16 @@ class Builtins {
 
 // A `Context` must not outlive a `Config`
 class Context {
+   pub const clang::ASTContext& ast_ctx;
    priv Map<const clang::Decl*, Node<Type>>
        type_lookup;                            // For mapping bound declarations to exisiting types.
    READ_ONLY(Vec<Node<TypeDecl>>, type_decls); // Types to output.
    READ_ONLY(Vec<Node<FunctionDecl>>, function_decls); // Functions to output.
    READ_ONLY(Vec<Node<VariableDecl>>, variable_decls); // Variables to output.
 
-   pub Config& cfg;
-   pub Builtins builtins; // Atomic types defined in `rt.nim`
-   pub Context(Config& cfg) : cfg(cfg) {}
+   pub const Config& cfg;
+   pub const Builtins builtins; // Atomic types defined in `rt.nim`
+   pub Context(const Config& cfg, const clang::ASTContext& ast_ctx) : cfg(cfg), ast_ctx(ast_ctx) {}
 
    pub fn lookup(const clang::Decl* decl) const -> Opt<Node<Type>> {
       auto decl_type = this->type_lookup.find(decl);
@@ -440,6 +419,13 @@ class Context {
 
    pub fn add(Node<VariableDecl> decl) {
       this->_variable_decls.push_back(decl);
+   }
+
+   pub fn access_filter(const clang::Decl* decl) -> bool {
+      // AS_protected
+      // AS_private
+      // AS_none
+      return decl->getAccess() == clang::AS_public;
    }
 };
 
@@ -568,7 +554,6 @@ MAP(const clang::BuiltinType*) {
       fatal("this should be unreachable because nim compiles with unsigned "
             "chars");
    }
-
    case clang::BuiltinType::Kind::Dependent:
    case clang::BuiltinType::Kind::Overload:
    case clang::BuiltinType::Kind::BoundMember:
@@ -697,7 +682,7 @@ MAP(const clang::NamedDecl*) {
 
 // FIXME: add the restrict_wrap counter.
 
-// If a `Type` has a `Decl` representation always map that. It seems to work.
+// If a `Type` has a `Decl` representation, always map that. It seems to work.
 MAP(const clang::TypedefType*) {
    return map(ctx, entity->getDecl());
 }
@@ -706,8 +691,16 @@ MAP(const clang::RecordType*) {
    return map(ctx, entity->getDecl());
 }
 
+MAP(const clang::EnumType*) {
+   return map(ctx, entity->getDecl());
+}
+
 MAP(const clang::PointerType*) {
-   return node<Type>(map(ctx, entity->getPointeeType()));
+   return node<Type>(PtrType(map(ctx, entity->getPointeeType())));
+}
+
+MAP(const clang::ReferenceType*) {
+   return node<Type>(RefType(map(ctx, entity->getPointeeType())));
 }
 
 MAP(const clang::VectorType*) {
@@ -725,6 +718,10 @@ MAP(const clang::VectorType*) {
    //    entity->dump();
    //    fatal("unhandled vector type");
    // }
+}
+
+MAP(const clang::ParenType*) {
+   return map(ctx, entity->getInnerType());
 }
 
 // return a suitable name from a named declaration.
@@ -773,6 +770,7 @@ WRAP(TypedefName) {
    if (decl->getKind() == clang::Decl::Kind::ObjCTypeParam) {
       fatal("obj-c is unsupported");
    } else {
+      decl->getLocation().dump(ctx.ast_ctx.getSourceManager());
       // This could be c++ `TypeAliasDecl` or a `TypedefDecl`.
       // Either way, we produce `type AliasName* = UnderlyingType`
       AliasTypeDecl alias(decl->getNameAsString(), map(ctx, decl->getUnderlyingType()));
@@ -783,14 +781,26 @@ WRAP(TypedefName) {
 }
 
 fn wrap_non_template(Context& ctx, const clang::FunctionDecl* decl) {
-   FreeFunctionDecl free_func(decl->getNameAsString());
+   Vec<FunctionParamDecl> formals;
+   for (auto param : decl->parameters()) {
+      formals.emplace_back(param->getNameAsString(), map(ctx, param->getType()));
+   }
+   Opt<Node<Type>> return_type = map(ctx, decl->getReturnType());
+   FreeFunctionDecl free_func(decl->getNameAsString(), decl->getQualifiedNameAsString(), formals,
+                              return_type);
    auto func = node<FunctionDecl>(free_func);
    ctx.add(func);
 }
 
+fn is_visible(const clang::VarDecl* decl) -> bool {
+   return decl->hasGlobalStorage() && !decl;
+}
+
 WRAP(Var) {
-   ctx.add(node<VariableDecl>(decl->getNameAsString(), decl->getQualifiedNameAsString(),
-                              map(ctx, decl->getType())));
+   if (ctx.access_filter(decl) && is_visible(decl)) {
+      ctx.add(node<VariableDecl>(decl->getNameAsString(), decl->getQualifiedNameAsString(),
+                                 map(ctx, decl->getType())));
+   }
 }
 
 WRAP(Function) {
@@ -821,9 +831,13 @@ MAP(const clang::Type*) {
       DISPATCH(Builtin);
       DISPATCH(Elaborated);
       DISPATCH(Record);
+      DISPATCH(Enum);
       DISPATCH(Pointer);
+      DISPATCH(LValueReference);
+      DISPATCH(RValueReference);
       DISPATCH(Typedef);
       DISPATCH(Vector);
+      DISPATCH(Paren);
    default:
       entity->dump();
       fatal("unhandled mapping: ", entity->getTypeClassName());
@@ -871,18 +885,37 @@ fn wrap(Context& ctx, const clang::Decl* decl) -> void {
       fatal("unhandled wrapping: ", decl->getDeclKindName(), "Decl");
    }
 }
+// Get a suitable location to store temp file.
+fn temp(Str name) -> Str {
+   return os::temp_file("ensnare_system_includes_" + name);
+}
 
-class Visitor : public clang::RecursiveASTVisitor<Visitor> {
-   priv Context& ctx;
-   priv const clang::ASTContext& ast_ctx;
+// Get some verbose compiler logs to parse.
+fn get_raw_include_paths() -> Str {
+   os::write_file(temp("test"), ""); // so the compiler does not error.
+   Str cmd = "clang++ -xc++ -c -v " + temp("test") + " 2>&1";
+   return os::successful_process_output(cmd);
+}
 
-   pub Visitor(Context& ctx, const clang::ASTContext& ast_ctx) : ctx(ctx), ast_ctx(ast_ctx) {}
-
-   pub fn VisitDecl(clang::Decl* decl) -> bool {
-      wrap(this->ctx, decl);
-      return true;
+// Parse include paths out of some verbose compiler logs.
+fn include_paths() -> Vec<Str> {
+   Vec<Str> result;
+   auto lines = split_newlines(get_raw_include_paths());
+   if (lines.size() == 0) {
+      return result;
    }
-};
+   auto start = std::find(lines.begin(), lines.end(), "#include <...> search starts here:");
+   auto stop = std::find(lines.begin(), lines.end(), "End of search list.");
+   if (start == lines.end() || stop == lines.end()) {
+      fatal("failed to parse include paths");
+   }
+   for (auto it = start + 1; it != stop; it++) {
+      if (it->size() > 0) {
+         result.push_back("-isystem" + ((*it)[0] == ' ' ? it->substr(1) : *it));
+      }
+   }
+   return result;
+}
 
 #undef DISPATCH
 #undef DISPATCH_ANY
@@ -898,10 +931,48 @@ fn indent() -> Str {
    return result;
 }
 
+fn indent(const Str& str) -> Str {
+   Str result;
+   for (const auto line : split_newlines(str)) {
+      result += indent() + line + "\n";
+   }
+   return result;
+}
+
 fn render(const Node<Type>& type) -> Str;
 
 fn render(const Node<Sym>& sym) -> Str {
    return sym->latest();
+}
+
+fn render(const AtomType& typ) -> Str {
+   return render(typ.name());
+}
+
+fn render(const PtrType& typ) -> Str {
+   return "ptr " + render(typ.pointee());
+}
+
+fn render(const RefType& typ) -> Str {
+   return "var " + render(typ.pointee());
+}
+
+fn render(const OpaqueType& typ) -> Str {
+   return "object";
+}
+
+fn render(const Node<Type>& type) -> Str {
+   if (is<AtomType>(type)) {
+      return render(deref<AtomType>(type));
+   } else if (is<PtrType>(type)) {
+      return render(deref<PtrType>(type));
+   } else if (is<RefType>(type)) {
+      return render(deref<RefType>(type));
+   } else if (is<OpaqueType>(type)) {
+      return render(deref<OpaqueType>(type));
+   } else {
+      fatal("unreachable");
+   }
 }
 
 fn render_pragmas(const Vec<Str>& pragmas) -> Str {
@@ -925,7 +996,7 @@ fn import_cpp(const Str& pattern) -> Str {
 }
 
 fn render(const AliasTypeDecl& decl) -> Str {
-   return render(decl.name()) + "* = " + render(decl.type());
+   return render(decl.name()) + "* = " + render(decl.type()) + "\n";
 }
 
 fn render(const EnumFieldDecl& decl) -> Str {
@@ -942,12 +1013,12 @@ fn render(const EnumTypeDecl& decl) -> Str {
 }
 
 fn render(const RecordTypeDecl& decl) -> Str {
-   return "FIXME\n";
+   return render(decl.name()) + "* = object\n";
 }
 
 fn render(const Node<TypeDecl>& decl) -> Str {
    if (is<AliasTypeDecl>(decl)) {
-      return rende(deref<AliasTypeDecl>(decl));
+      return render(deref<AliasTypeDecl>(decl));
    } else if (is<EnumTypeDecl>(decl)) {
       return render(deref<EnumTypeDecl>(decl));
    } else if (is<RecordTypeDecl>(decl)) {
@@ -957,47 +1028,102 @@ fn render(const Node<TypeDecl>& decl) -> Str {
    }
 }
 
+fn render(const FunctionParamDecl& decl) -> Str {
+   return render(decl.name()) + ": " + render(decl.type());
+}
+
+fn render(const FreeFunctionDecl& decl) -> Str {
+   auto result = "proc " + render(decl.name()) + "*(";
+   auto first = true;
+   for (const auto& formal : decl.formals()) {
+      if (not first) {
+         result += ", ";
+      }
+      result += render(formal);
+      first = false;
+   }
+   result += ")";
+   if (decl.return_type()) {
+      result += ": ";
+      result += render(*decl.return_type());
+   }
+   result += "\n";
+   result += indent() + render_pragmas({import_cpp(decl.cpp_name())}) + "\n";
+   return result;
+}
+
 fn render(const Node<FunctionDecl>& decl) -> Str {
-   return "FIXME\n";
+   if (is<FreeFunctionDecl>(decl)) {
+      return render(deref<FreeFunctionDecl>(decl));
+   } else {
+      fatal("unreachable");
+   }
 }
 
 fn render(const Node<VariableDecl>& decl) -> Str {
-   return "FIXME\n";
+   return render(decl->name()) + "* " + render_pragmas({import_cpp(decl->cpp_name())}) + ": " +
+          render(decl->type()) + "\n";
 }
 
-fn render(const Node<Type>& type) -> Str {
-   return "FIXME\n";
-}
 } // namespace rendering
 
 fn finalize(const Context& ctx) {
    Str output;
-   output += "# ensnare generated wrapper\n";
-   output += "\n";
-   for (const auto& type_decl : ctx.type_decls()) {
-      output += rendering::render(type_decl);
+   output += "# generated bindings --- machine dependent\n";
+   if (ctx.type_decls().size() != 0) {
+      output += "# type section\n";
+      output += "type\n";
+      for (const auto& type_decl : ctx.type_decls()) {
+         output += rendering::indent(rendering::render(type_decl));
+      }
    }
-   for (const auto& function_decl : ctx.function_decls()) {
-      output += rendering::render(function_decl);
+   if (ctx.function_decls().size() != 0) {
+      output += "# function section\n";
+      for (const auto& function_decl : ctx.function_decls()) {
+         output += rendering::render(function_decl);
+      }
    }
-   for (const auto& variable_decl : ctx.variable_decls()) {
-      output += rendering::render(variable_decl);
+   if (ctx.variable_decls().size() != 0) {
+      output += "# variable section\n";
+      output += "var\n";
+      for (const auto& variable_decl : ctx.variable_decls()) {
+         output += rendering::indent(rendering::render(variable_decl));
+      }
    }
    os::write_file(ctx.cfg.name() + ".nim", output);
 }
 
-fn run(int argc, const char* argv[]) -> bool {
-   Config cfg(argc, argv);
-   auto tu = parse_translation_unit(cfg);
-   Context ctx(cfg);
-   Visitor visitor(ctx, tu->getASTContext());
-   auto result = visitor.TraverseAST(tu->getASTContext());
-   if (!result) {
-      return false;
-   } else {
-      finalize(ctx);
+class BindAction : public clang::RecursiveASTVisitor<BindAction> {
+   priv const Config& cfg;
+   priv const std::unique_ptr<clang::ASTUnit> tu;
+   priv Context ctx;
+
+   // Load a translation unit from user provided arguments with additional include path arguments.
+   priv fn parse_tu() -> std::unique_ptr<clang::ASTUnit> {
+      Vec<Str> args = {"-xc++"};
+      auto includes = include_paths();
+      args.insert(args.end(), includes.begin(), includes.end());
+      args.insert(args.end(), cfg.clang_args().begin(), cfg.clang_args().end());
+      return clang::tooling::buildASTFromCodeWithArgs(cfg.header_file(), args, "ensnare_headers.h",
+                                                      "ensnare");
+   }
+
+   pub BindAction(const Config& cfg) : cfg(cfg), tu(parse_tu()), ctx(cfg, tu->getASTContext()) {
+      auto result = this->TraverseAST(tu->getASTContext());
+      if (!result) {
+         fatal("ensnare ");
+      }
+   }
+
+   pub fn VisitDecl(clang::Decl* decl) -> bool {
+      wrap(this->ctx, decl);
       return true;
    }
+};
+
+fn run(int argc, const char* argv[]) {
+   const Config cfg(argc, argv);
+   BindAction action(cfg);
 }
 } // namespace ensnare::ct
 
