@@ -6,7 +6,7 @@
 from std/os import is_absolute, split_file, `/`
 import private/macro_utils
 
-const rt_hpp = "ensnare/private/runtime.hpp"
+const hpp = "ensnare/private/runtime.hpp"
 
 macro cpp_expr*(T, pattern, args): auto =
    let id = nskProc{"cpp_expr"}
@@ -24,8 +24,8 @@ macro cpp_expr*(T, pattern, args): auto =
                         nnkEmpty{}, nnkEmpty{}}
    result = nnkStmtList{def, call}
 
-type LaunderClassBuf*[T] {.import_cpp: "ensnare::rt::LaunderClassBuf<'0>",
-                           header: rt_hpp.} = object
+type LaunderClassBuf*[T] {.import_cpp: "ensnare::runtime::LaunderClassBuf<'0>",
+                           header: hpp.} = object
 
 proc unsafe_destroy[T](self: var LaunderClassBuf[T])
    {.import_cpp: "#.unsafe_destroy(@)".}
@@ -110,8 +110,8 @@ type # exntensions
    cpp_float128* {.import_cpp: "__float128".} = float64
 
 type
-   cpp_const*[T] {.import_cpp: "ensnare::rt::constant<'0>".} = object
-   cpp_unsized_array*[T] {.import_cpp: "ensnare::rt::unsized_array<'0>", header: rt_hpp.} = object
+   cpp_const*[T] {.import_cpp: "ensnare::runtime::constant<'0>", header: hpp.} = object
+   cpp_unsized_array*[T] {.import_cpp: "ensnare::runtime::unsized_array<'0>", header: hpp.} = object
    cpp_char_ptr* = ptr cpp_const[char]
    cpp_mutable_char_ptr* = ptr char
 

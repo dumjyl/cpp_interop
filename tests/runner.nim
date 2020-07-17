@@ -14,6 +14,9 @@ proc units =
    for test in ["abc", "cstdint"]:
       let (output, code) = invoke(test)
       if code == 0:
+         if output.len != 0:
+            echo "Ensnare Output:\n"
+            echo output
          if read_file(nim_gen_file(test)) == read_file(hpp_test_file(test)):
             echo "Success: ", test
          else:

@@ -1,5 +1,15 @@
 #pragma once
 
+#include <iostream>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <variant>
+#include <vector>
+
+// preserve order
+#include "ensnare/private/syn.hpp"
+
 namespace ensnare {
 template <typename T> using Vec = std::vector<T>;
 
@@ -52,3 +62,4 @@ template <typename... Args> fn fatal [[noreturn]] (Args... args) {
    std::exit(1);
 }
 }; // namespace ensnare
+#include "ensnare/private/undef_syn.hpp"

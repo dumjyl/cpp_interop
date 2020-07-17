@@ -10,15 +10,7 @@
 #elif
 #include <filesystem>
 #endif
-#include <cstdlib>
 #include <fstream>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <variant>
-#include <vector>
 
 // preserve order
 #include "ensnare/private/bit_utils.hpp"
@@ -338,6 +330,209 @@ class VariableDecl {
       : _name(node<Sym>(name)), _cpp_name(name), _type(type) {}
 };
 
+namespace rendering {
+const std::size_t indent_size = 3;
+fn indent() -> Str {
+   Str result;
+   for (auto i = 0; i < indent_size; i += 1) {
+      result += ' ';
+   }
+   return result;
+}
+
+fn indent(const Str& str) -> Str {
+   Str result;
+   for (const auto line : split_newlines(str)) {
+      result += indent() + line + "\n";
+   }
+   return result;
+}
+
+fn render(const Node<Type>& type) -> Str;
+
+const llvm::StringSet nim_keywords(
+    {"addr",      "and",     "as",    "asm",      "bind",      "block",  "break",   "case",
+     "cast",      "concept", "const", "continue", "converter", "defer",  "discard", "distinct",
+     "div",       "do",      "elif",  "else",     "end",       "enum",   "except",  "export",
+     "finally",   "for",     "from",  "func",     "if",        "import", "in",      "include",
+     "interface", "is",      "isnot", "iterator", "let",       "macro",  "method",  "mixin",
+     "mod",       "nil",     "not",   "notin",    "object",    "of",     "or",      "out",
+     "proc",      "ptr",     "raise", "ref",      "return",    "shl",    "shr",     "static",
+     "template",  "try",     "tuple", "type",     "using",     "var",    "when",    "while",
+     "xor",       "yield"});
+
+fn is_nim_keyword(const Str& str) -> bool { return nim_keywords.count(str) != 0; }
+
+fn incl(CharSet& chars, char low, char high) {
+   for (auto i = static_cast<std::size_t>(low); i <= high; i += 1) {
+      chars.incl(static_cast<char>(i));
+   }
+}
+
+fn ident_chars() -> CharSet {
+   CharSet result;
+   incl(result, 'A', 'Z');
+   incl(result, 'a', 'z');
+   incl(result, '0', '9');
+   result.incl('_');
+   return result;
+}
+
+fn is_ident_chars(const Str& str) -> bool {
+   for (auto c : str) {
+      if (!ident_chars()[c]) {
+         return false;
+      }
+   }
+   return true;
+}
+
+fn needs_stropping(const Str& sym) { return is_nim_keyword(sym) || !is_ident_chars(sym); }
+
+fn render(const Node<Sym>& sym) -> Str {
+   auto result = sym->latest();
+   if (needs_stropping(result)) {
+      return "`" + result + "`";
+   } else {
+      return result;
+   }
+}
+
+fn render(const AtomType& typ) -> Str { return render(typ.name()); }
+
+fn render(const PtrType& typ) -> Str { return "ptr " + render(typ.pointee()); }
+
+fn render(const RefType& typ) -> Str { return "var " + render(typ.pointee()); }
+
+fn render(const OpaqueType& typ) -> Str { return "object"; }
+
+fn render(const Node<Type>& type) -> Str {
+   if (is<AtomType>(type)) {
+      return render(deref<AtomType>(type));
+   } else if (is<PtrType>(type)) {
+      return render(deref<PtrType>(type));
+   } else if (is<RefType>(type)) {
+      return render(deref<RefType>(type));
+   } else if (is<OpaqueType>(type)) {
+      return render(deref<OpaqueType>(type));
+   } else {
+      fatal("unreachable: render(Type)");
+   }
+}
+
+fn render_pragmas(const Vec<Str>& pragmas) -> Str {
+   Str result = "{.";
+   for (const auto& pragma : pragmas) {
+      if (result.size() > 2) {
+         result += ", ";
+      }
+      result += pragma;
+   }
+   result += ".}";
+   return result;
+}
+
+fn render_colon(const Str& a, const Str& b) -> Str { return a + ": " + b; }
+
+fn import_cpp(const Str& pattern) -> Str { return "import_cpp: \"" + pattern + "\""; }
+
+fn render(const AliasTypeDecl& decl) -> Str {
+   return render(decl.name()) + "* = " + render(decl.type()) + "\n";
+}
+
+fn render(const EnumFieldDecl& decl) -> Str { return indent() + render(decl.name()) + '\n'; }
+
+fn render(const EnumTypeDecl& decl) -> Str {
+   Str result =
+       render(decl.name()) + "* " + render_pragmas({import_cpp(decl.cpp_name())}) + " = enum\n";
+   for (const auto& field : decl.fields()) {
+      result += render(field);
+   }
+   return result;
+}
+
+fn render(const RecordTypeDecl& decl) -> Str {
+   return render(decl.name()) + "* " + render_pragmas({import_cpp(decl.cpp_name())}) +
+          " = object\n";
+}
+
+fn render(const Node<TypeDecl>& decl) -> Str {
+   if (is<AliasTypeDecl>(decl)) {
+      return render(deref<AliasTypeDecl>(decl));
+   } else if (is<EnumTypeDecl>(decl)) {
+      return render(deref<EnumTypeDecl>(decl));
+   } else if (is<RecordTypeDecl>(decl)) {
+      return render(deref<RecordTypeDecl>(decl));
+   } else {
+      fatal("unreachable: render(TypeDecl)");
+   }
+}
+
+fn render(const ParamDecl& decl) -> Str { return render(decl.name()) + ": " + render(decl.type()); }
+
+fn render(const FunctionDecl& decl) -> Str {
+   auto result = "proc " + render(decl.name()) + "*(";
+   auto first = true;
+   for (const auto& formal : decl.formals()) {
+      if (not first) {
+         result += ", ";
+      }
+      result += render(formal);
+      first = false;
+   }
+   result += ")";
+   if (decl.return_type()) {
+      result += ": ";
+      result += render(*decl.return_type());
+   }
+   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
+   return result;
+}
+
+fn render(const ConstructorDecl& decl) -> Str {
+   Str result = "proc `{}`*(Self: type[";
+   result += render(decl.self()) + "]";
+   for (const auto& formal : decl.formals()) {
+      result += ", " + render(formal);
+   }
+   result += "): " + render(decl.self());
+   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
+   return result;
+}
+
+fn render(const MethodDecl& decl) -> Str {
+   Str result = "proc " + render(decl.name()) + "*(self: ";
+   result += render(decl.self());
+   for (const auto& formal : decl.formals()) {
+      result += ", " + render(formal);
+   }
+   result += ")";
+   if (decl.return_type()) {
+      result += ": ";
+      result += render(*decl.return_type());
+   }
+   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
+   return result;
+}
+
+fn render(const Node<RoutineDecl>& decl) -> Str {
+   if (is<FunctionDecl>(decl)) {
+      return render(deref<FunctionDecl>(decl));
+   } else if (is<ConstructorDecl>(decl)) {
+      return render(deref<ConstructorDecl>(decl));
+   } else if (is<MethodDecl>(decl)) {
+      return render(deref<MethodDecl>(decl));
+   } else {
+      fatal("unreachable: render(FunctionDecl)");
+   }
+}
+
+fn render(const Node<VariableDecl>& decl) -> Str {
+   return render(decl->name()) + "* " + render_pragmas({import_cpp(decl->cpp_name())}) + ": " +
+          render(decl->type()) + "\n";
+}
+} // namespace rendering
+
 // The cananonical types defined in runtime.nim
 class Builtins {
    priv static fn init(const char* name) -> Node<Type> { return node<Type>(AtomType(name)); }
@@ -368,6 +563,7 @@ class Builtins {
    pub const Node<Type> _ocl_float16 = Builtins::init("cpp_ocl_float16");
    pub const Node<Type> _float16 = Builtins::init("cpp_float16");
    pub const Node<Type> _float128 = Builtins::init("cpp_float128");
+   // we treat cstddef as builtins too.
    pub const Node<Type> _size_t = Builtins::init("cpp_size_t");
    pub const Node<Type> _ptrdiff_t = Builtins::init("cpp_ptrdiff_t");
    pub const Node<Type> _max_align_t = Builtins::init("cpp_max_align_t");
@@ -723,6 +919,8 @@ MAP(const clang::VectorType&) {
 
 MAP(const clang::ParenType&) { return map(ctx, entity.getInnerType()); }
 
+MAP(const clang::DecltypeType&) { return map(ctx, entity.getUnderlyingType()); }
+
 // return a suitable name from a named declaration.
 fn nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
    auto name = decl.getDeclName();
@@ -749,6 +947,93 @@ fn nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
 }
 
 fn qualified_nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
+   /*
+   FIXME: steal this.
+
+   void NamedDecl::printNestedNameSpecifier(raw_ostream & OS, const PrintingPolicy& P) const {
+      const DeclContext* Ctx = getDeclContext();
+
+      // For ObjC methods and properties, look through categories and use the
+      // interface as context.
+      if (auto* MD = dyn_cast<ObjCMethodDecl>(this))
+         if (auto* ID = MD->getClassInterface())
+            Ctx = ID;
+      if (auto* PD = dyn_cast<ObjCPropertyDecl>(this)) {
+         if (auto* MD = PD->getGetterMethodDecl())
+            if (auto* ID = MD->getClassInterface())
+               Ctx = ID;
+      }
+
+      if (Ctx->isFunctionOrMethod())
+         return;
+
+      using ContextsTy = SmallVector<const DeclContext*, 8>;
+      ContextsTy Contexts;
+
+      // Collect named contexts.
+      while (Ctx) {
+         if (isa<NamedDecl>(Ctx))
+            Contexts.push_back(Ctx);
+         Ctx = Ctx->getParent();
+      }
+
+      for (const DeclContext* DC : llvm::reverse(Contexts)) {
+         if (const auto* Spec = dyn_cast<ClassTemplateSpecializationDecl>(DC)) {
+            OS << Spec->getName();
+            const TemplateArgumentList& TemplateArgs = Spec->getTemplateArgs();
+            printTemplateArgumentList(OS, TemplateArgs.asArray(), P);
+         } else if (const auto* ND = dyn_cast<NamespaceDecl>(DC)) {
+            if (P.SuppressUnwrittenScope && (ND->isAnonymousNamespace() || ND->isInline()))
+               continue;
+            if (ND->isAnonymousNamespace()) {
+               OS << (P.MSVCFormatting ? "`anonymous namespace\'" : "(anonymous namespace)");
+            } else
+               OS << *ND;
+         } else if (const auto* RD = dyn_cast<RecordDecl>(DC)) {
+            if (!RD->getIdentifier())
+               OS << "(anonymous " << RD->getKindName() << ')';
+            else
+               OS << *RD;
+         } else if (const auto* FD = dyn_cast<FunctionDecl>(DC)) {
+            const FunctionProtoType* FT = nullptr;
+            if (FD->hasWrittenPrototype())
+               FT = dyn_cast<FunctionProtoType>(FD->getType()->castAs<FunctionType>());
+
+            OS << *FD << '(';
+            if (FT) {
+               unsigned NumParams = FD->getNumParams();
+               for (unsigned i = 0; i < NumParams; ++i) {
+                  if (i)
+                     OS << ", ";
+                  OS << FD->getParamDecl(i)->getType().stream(P);
+               }
+
+               if (FT->isVariadic()) {
+                  if (NumParams > 0)
+                     OS << ", ";
+                  OS << "...";
+               }
+            }
+            OS << ')';
+         } else if (const auto* ED = dyn_cast<EnumDecl>(DC)) {
+            // C++ [dcl.enum]p10: Each enum-name and each unscoped
+            // enumerator is declared in the scope that immediately contains
+            // the enum-specifier. Each scoped enumerator is declared in the
+            // scope of the enumeration.
+            // For the case of unscoped enumerator, do not include in the qualified
+            // name any information about its enum enclosing scope, as its visibility
+            // is global.
+            if (ED->isScoped())
+               OS << *ED;
+            else
+               continue;
+         } else {
+            OS << *cast<NamedDecl>(DC);
+         }
+         OS << "::";
+      }
+   }
+   */
    // auto name = decl.getDeclName();
    // switch (name.getNameKind()) {
    // case clang::DeclarationName::NameKind::Identifier: {
@@ -798,6 +1083,17 @@ WRAP(TypedefName) {
       decl.getLocation().dump(ctx.ast_ctx.getSourceManager());
       // This could be c++ `TypeAliasDecl` or a `TypedefDecl`.
       // Either way, we produce `type AliasName* = UnderlyingType`
+      auto qualified_name = decl.getQualifiedNameAsString();
+      if (qualified_name == "std::size_t" || qualified_name == "size_t") {
+         ctx.set(decl, ctx.builtins._size_t);
+         return;
+      } else if (qualified_name == "std::ptrdiff_t" || qualified_name == "ptrdiff_t") {
+         ctx.set(decl, ctx.builtins._ptrdiff_t);
+         return;
+      } else if (qualified_name == "std::nullptr_t") {
+         ctx.set(decl, ctx.builtins._nullptr_t);
+         return;
+      }
       AliasTypeDecl alias(qualified_nim_name(ctx, decl), map(ctx, decl.getUnderlyingType()));
       auto type_decl = node<TypeDecl>(alias);
       ctx.set(decl, map(ctx, type_decl));
@@ -912,6 +1208,7 @@ MAP(const clang::Type&) {
       DISPATCH(Typedef);
       DISPATCH(Vector);
       DISPATCH(Paren);
+      DISPATCH(Decltype);
    default:
       entity.dump();
       fatal("unhandled mapping: ", entity.getTypeClassName());
@@ -951,6 +1248,7 @@ fn wrap(Context& ctx, const clang::Decl& decl) -> void {
       DISCARD(Field);
       DISCARD(ParmVar);
       DISCARD(AccessSpec);
+      DISCARD(Using);
       DISPATCH_ANY(TypedefName);
       DISPATCH_ANY(Record);
       DISPATCH(Function);
@@ -996,209 +1294,6 @@ fn include_paths() -> Vec<Str> {
 #undef DISPATCH_ANY
 #undef DISCARD
 
-namespace rendering {
-const std::size_t indent_size = 3;
-fn indent() -> Str {
-   Str result;
-   for (auto i = 0; i < indent_size; i += 1) {
-      result += ' ';
-   }
-   return result;
-}
-
-fn indent(const Str& str) -> Str {
-   Str result;
-   for (const auto line : split_newlines(str)) {
-      result += indent() + line + "\n";
-   }
-   return result;
-}
-
-fn render(const Node<Type>& type) -> Str;
-
-const llvm::StringSet nim_keywords(
-    {"addr",      "and",     "as",    "asm",      "bind",      "block",  "break",   "case",
-     "cast",      "concept", "const", "continue", "converter", "defer",  "discard", "distinct",
-     "div",       "do",      "elif",  "else",     "end",       "enum",   "except",  "export",
-     "finally",   "for",     "from",  "func",     "if",        "import", "in",      "include",
-     "interface", "is",      "isnot", "iterator", "let",       "macro",  "method",  "mixin",
-     "mod",       "nil",     "not",   "notin",    "object",    "of",     "or",      "out",
-     "proc",      "ptr",     "raise", "ref",      "return",    "shl",    "shr",     "static",
-     "template",  "try",     "tuple", "type",     "using",     "var",    "when",    "while",
-     "xor",       "yield"});
-
-fn is_nim_keyword(const Str& str) -> bool { return nim_keywords.count(str) == 1; }
-
-fn incl(CharSet& chars, char low, char high) {
-   for (auto i = static_cast<std::size_t>(low); i <= high; i += 1) {
-      chars.incl(static_cast<char>(i));
-   }
-}
-
-fn ident_chars() -> CharSet {
-   CharSet result;
-   incl(result, 'A', 'Z');
-   incl(result, 'a', 'z');
-   incl(result, '0', '9');
-   result.incl('_');
-   return result;
-}
-
-fn is_ident_chars(const Str& str) -> bool {
-   for (auto c : str) {
-      if (!ident_chars().contains(c)) {
-         return false;
-      }
-   }
-   return true;
-}
-
-fn needs_stropping(const Str& sym) { return is_nim_keyword(sym) || !is_ident_chars(sym); }
-
-fn render(const Node<Sym>& sym) -> Str {
-   auto result = sym->latest();
-   if (needs_stropping(result)) {
-      return "`" + result + "`";
-   } else {
-      return result;
-   }
-}
-
-fn render(const AtomType& typ) -> Str { return render(typ.name()); }
-
-fn render(const PtrType& typ) -> Str { return "ptr " + render(typ.pointee()); }
-
-fn render(const RefType& typ) -> Str { return "var " + render(typ.pointee()); }
-
-fn render(const OpaqueType& typ) -> Str { return "object"; }
-
-fn render(const Node<Type>& type) -> Str {
-   if (is<AtomType>(type)) {
-      return render(deref<AtomType>(type));
-   } else if (is<PtrType>(type)) {
-      return render(deref<PtrType>(type));
-   } else if (is<RefType>(type)) {
-      return render(deref<RefType>(type));
-   } else if (is<OpaqueType>(type)) {
-      return render(deref<OpaqueType>(type));
-   } else {
-      fatal("unreachable: render(Type)");
-   }
-}
-
-fn render_pragmas(const Vec<Str>& pragmas) -> Str {
-   Str result = "{.";
-   for (const auto& pragma : pragmas) {
-      if (result.size() > 2) {
-         result += ", ";
-      }
-      result += pragma;
-   }
-   result += ".}";
-   return result;
-}
-
-fn render_colon(const Str& a, const Str& b) -> Str { return a + ": " + b; }
-
-fn import_cpp(const Str& pattern) -> Str { return "import_cpp: \"" + pattern + "\""; }
-
-fn render(const AliasTypeDecl& decl) -> Str {
-   return render(decl.name()) + "* = " + render(decl.type()) + "\n";
-}
-
-fn render(const EnumFieldDecl& decl) -> Str { return indent() + render(decl.name()) + '\n'; }
-
-fn render(const EnumTypeDecl& decl) -> Str {
-   Str result =
-       render(decl.name()) + "* " + render_pragmas({import_cpp(decl.cpp_name())}) + " = enum\n";
-   for (const auto& field : decl.fields()) {
-      result += render(field);
-   }
-   return result;
-}
-
-fn render(const RecordTypeDecl& decl) -> Str {
-   return render(decl.name()) + "* " + render_pragmas({import_cpp(decl.cpp_name())}) +
-          " = object\n";
-}
-
-fn render(const Node<TypeDecl>& decl) -> Str {
-   if (is<AliasTypeDecl>(decl)) {
-      return render(deref<AliasTypeDecl>(decl));
-   } else if (is<EnumTypeDecl>(decl)) {
-      return render(deref<EnumTypeDecl>(decl));
-   } else if (is<RecordTypeDecl>(decl)) {
-      return render(deref<RecordTypeDecl>(decl));
-   } else {
-      fatal("unreachable: render(TypeDecl)");
-   }
-}
-
-fn render(const ParamDecl& decl) -> Str { return render(decl.name()) + ": " + render(decl.type()); }
-
-fn render(const FunctionDecl& decl) -> Str {
-   auto result = "proc " + render(decl.name()) + "*(";
-   auto first = true;
-   for (const auto& formal : decl.formals()) {
-      if (not first) {
-         result += ", ";
-      }
-      result += render(formal);
-      first = false;
-   }
-   result += ")";
-   if (decl.return_type()) {
-      result += ": ";
-      result += render(*decl.return_type());
-   }
-   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
-   return result;
-}
-
-fn render(const ConstructorDecl& decl) -> Str {
-   Str result = "proc `{}`*(Self: type[";
-   result += render(decl.self()) + "]";
-   for (const auto& formal : decl.formals()) {
-      result += ", " + render(formal);
-   }
-   result += "): " + render(decl.self());
-   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
-   return result;
-}
-
-fn render(const MethodDecl& decl) -> Str {
-   Str result = "proc " + render(decl.name()) + "*(self: ";
-   result += render(decl.self());
-   for (const auto& formal : decl.formals()) {
-      result += ", " + render(formal);
-   }
-   result += ")";
-   if (decl.return_type()) {
-      result += ": ";
-      result += render(*decl.return_type());
-   }
-   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
-   return result;
-}
-
-fn render(const Node<RoutineDecl>& decl) -> Str {
-   if (is<FunctionDecl>(decl)) {
-      return render(deref<FunctionDecl>(decl));
-   } else if (is<ConstructorDecl>(decl)) {
-      return render(deref<ConstructorDecl>(decl));
-   } else if (is<MethodDecl>(decl)) {
-      return render(deref<MethodDecl>(decl));
-   } else {
-      fatal("unreachable: render(FunctionDecl)");
-   }
-}
-
-fn render(const Node<VariableDecl>& decl) -> Str {
-   return render(decl->name()) + "* " + render_pragmas({import_cpp(decl->cpp_name())}) + ": " +
-          render(decl->type()) + "\n";
-}
-} // namespace rendering
-
 // Instantiate this class to do the work. The Config will grow in complexity to support
 // introspection to produce wrappers that make c++ devs jealous.
 class BindAction : public clang::RecursiveASTVisitor<BindAction> {
@@ -1221,20 +1316,20 @@ class BindAction : public clang::RecursiveASTVisitor<BindAction> {
    priv fn finalize() {
       Str output = "import ensnare/runtime\n";
       if (ctx.type_decls().size() != 0) {
-         output += "\n# type section\n\n";
+         output += "\n# types\n\n";
          output += "type\n";
          for (const auto& type_decl : ctx.type_decls()) {
             output += rendering::indent(rendering::render(type_decl));
          }
       }
       if (ctx.routine_decls().size() != 0) {
-         output += "\n# function section\n\n";
+         output += "\n# routines\n\n";
          for (const auto& routine_decl : ctx.routine_decls()) {
             output += rendering::render(routine_decl);
          }
       }
       if (ctx.variable_decls().size() != 0) {
-         output += "\n# variable section\n\n";
+         output += "\n# variables\n\n";
          output += "var\n";
          for (const auto& variable_decl : ctx.variable_decls()) {
             output += rendering::indent(rendering::render(variable_decl));

@@ -5,7 +5,7 @@
 #include <memory>
 #include <type_traits>
 
-namespace ensnare::rt {
+namespace ensnare::runtime {
 template <typename T> using unsized_array = T[];
 template <typename T> using constant = std::add_const_t<T>;
 
@@ -48,6 +48,6 @@ template <typename T> class LaunderClassBuf {
 
    pub fn unsafe_deref() -> T& { return this->read_buf(); }
 };
-} // namespace ensnare::rt
+} // namespace ensnare::runtime
 
 #include "ensnare/private/undef_syn.hpp"

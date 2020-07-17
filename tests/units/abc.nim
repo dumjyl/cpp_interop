@@ -5,7 +5,7 @@ import ensnare/runtime
 type
    `blah-Foo`* {.import_cpp: "blah::Foo".} = object
 
-# function section
+# routine section
 
 proc `{}`*(Self: type[`blah-Foo`], a: cpp_int, b: cpp_int): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
