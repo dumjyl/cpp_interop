@@ -1,0 +1,125 @@
+From d1c1344c22f627dbe2d79ac603e3729da5209ad5 Mon Sep 17 00:00:00 2001
+From: Jasper Jenkins <jasper.vs.jenkins@gmail.com>
+Date: Fri, 10 Jul 2020 14:08:35 -0700
+Subject: [PATCH] allow resolving varargs untyped in generics/templates
+
+---
+ compiler/semgnrc.nim  | 34 +++++++++++++---------------------
+ compiler/semtempl.nim |  2 +-
+ compiler/sigmatch.nim |  8 ++++----
+ 3 files changed, 18 insertions(+), 26 deletions(-)
+
+diff --git a/compiler/semgnrc.nim b/compiler/semgnrc.nim
+index 3366732ca..b7dfbd866 100644
+--- a/compiler/semgnrc.nim
++++ b/compiler/semgnrc.nim
+@@ -51,7 +51,8 @@ proc semGenericStmtScope(c: PContext, n: PNode,
+   closeScope(c)
+ 
+ template macroToExpand(s): untyped =
+-  s.kind in {skMacro, skTemplate} and (s.typ.len == 1 or sfAllUntyped in s.flags)
++  # XXX: templates local to the generic routine don't have a type.
++  s.kind in {skMacro, skTemplate} and (s.typ != nil and s.typ.len == 1 or sfAllUntyped in s.flags)
+ 
+ template macroToExpandSym(s): untyped =
+   sfCustomPragma notin s.flags and s.kind in {skMacro, skTemplate} and
+@@ -74,17 +75,10 @@ proc semGenericStmtSymbol(c: PContext, n: PNode, s: PSym,
+     result = n
+   of skProc, skFunc, skMethod, skIterator, skConverter, skModule:
+     result = symChoice(c, n, s, scOpen)
+-  of skTemplate:
++  of skMacro, skTemplate:
+     if macroToExpandSym(s):
+       onUse(n.info, s)
+-      result = semTemplateExpr(c, n, s, {efNoSemCheck})
+-      result = semGenericStmt(c, result, {}, ctx)
+-    else:
+-      result = symChoice(c, n, s, scOpen)
+-  of skMacro:
+-    if macroToExpandSym(s):
+-      onUse(n.info, s)
+-      result = semMacroExpr(c, n, n, s, {efNoSemCheck})
++      result = semDirectOp(c, n, {efNoSemCheck})
+       result = semGenericStmt(c, result, {}, ctx)
+     else:
+       result = symChoice(c, n, s, scOpen)
+@@ -234,19 +228,10 @@ proc semGenericStmt(c: PContext, n: PNode,
+                         else: scOpen
+       let sc = symChoice(c, fn, s, whichChoice)
+       case s.kind
+-      of skMacro:
+-        if macroToExpand(s) and sc.safeLen <= 1:
+-          onUse(fn.info, s)
+-          result = semMacroExpr(c, n, n, s, {efNoSemCheck})
+-          result = semGenericStmt(c, result, flags, ctx)
+-        else:
+-          n[0] = sc
+-          result = n
+-        mixinContext = true
+-      of skTemplate:
++      of skMacro, skTemplate:
+         if macroToExpand(s) and sc.safeLen <= 1:
+           onUse(fn.info, s)
+-          result = semTemplateExpr(c, n, s, {efNoSemCheck})
++          result = semDirectOp(c, n, {efNoSemCheck})
+           result = semGenericStmt(c, result, flags, ctx)
+         else:
+           n[0] = sc
+@@ -481,6 +466,13 @@ proc semGenericStmt(c: PContext, n: PNode,
+       else:
+         body = s.getBody
+     else: body = n[bodyPos]
++    # don't check/bind symbols for dirty templates, maybe this should be a mixin context instead?
++    if n.kind == nkTemplateDef and n[pragmasPos].kind == nkPragma:
++      let dirtyId = getIdent(c.cache, "dirty").id
++      for pragma in n[pragmasPos]:
++        if pragma.kind == nkIdent and pragma.ident.id == dirtyId:
++          closeScope(c)
++          return
+     n[bodyPos] = semGenericStmtScope(c, body, flags, ctx)
+     closeScope(c)
+   of nkPragma, nkPragmaExpr: discard
+diff --git a/compiler/semtempl.nim b/compiler/semtempl.nim
+index c9cd82833..4132a16cf 100644
+--- a/compiler/semtempl.nim
++++ b/compiler/semtempl.nim
+@@ -690,7 +690,7 @@ proc semTemplateDef(c: PContext, n: PNode): PNode =
+ 
+ proc semPatternBody(c: var TemplCtx, n: PNode): PNode =
+   template templToExpand(s: untyped): untyped =
+-    s.kind == skTemplate and (s.typ.len == 1 or sfAllUntyped in s.flags)
++    s.kind == skTemplate and (s.typ != nil and s.typ.len == 1 or sfAllUntyped in s.flags)
+ 
+   proc newParam(c: var TemplCtx, n: PNode, s: PSym): PNode =
+     # the param added in the current scope is actually wrong here for
+diff --git a/compiler/sigmatch.nim b/compiler/sigmatch.nim
+index e663f96b6..fa7717f17 100644
+--- a/compiler/sigmatch.nim
++++ b/compiler/sigmatch.nim
+@@ -2255,9 +2255,12 @@ proc setSon(father: PNode, at: int, son: PNode) =
+   #for i in oldLen..<at:
+   #  father[i] = newNodeIT(nkEmpty, son.info, getSysType(tyVoid))
+ 
++template isVarargsUntyped(x): untyped =
++  x.kind == tyVarargs and x[0].kind == tyUntyped
++
+ # we are allowed to modify the calling node in the 'prepare*' procs:
+ proc prepareOperand(c: PContext; formal: PType; a: PNode): PNode =
+-  if formal.kind == tyUntyped and formal.len != 1:
++  if (formal.kind == tyUntyped or formal.isVarargsUntyped) and formal.len != 1:
+     # {tyTypeDesc, tyUntyped, tyTyped, tyProxy}:
+     # a.typ == nil is valid
+     result = a
+@@ -2301,9 +2304,6 @@ proc incrIndexType(t: PType) =
+   assert t.kind == tyArray
+   inc t[0].n[1].intVal
+ 
+-template isVarargsUntyped(x): untyped =
+-  x.kind == tyVarargs and x[0].kind == tyUntyped
+-
+ proc matchesAux(c: PContext, n, nOrig: PNode,
+                 m: var TCandidate, marker: var IntSet) =
+   var
+-- 
+2.17.1
+

@@ -1,0 +1,26 @@
+trigger: none
+pr:
+  - master
+jobs:
+- job: 'A'
+  timeoutInMinutes: 150
+  pool:
+    vmImage: 'windows-2019'
+  variables:
+    llvm_dir: clang+llvm-9.0.0-win64-mingw
+  steps:
+  - bash: choco install ninja
+    displayName: 'Install ninja build'
+  - bash: ./setup_llvm_project.sh
+    displayName: 'Setup llvm-project'
+  - bash: |
+      set -x
+      mkdir -p llvm-project/llvm/build
+      cd llvm-project/llvm/build
+      cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS="clang" -DLLVM_TARGETS_TO_BUILD="" -DLLVM_ENABLE_LIBXML2=OFF -DCMAKE_INSTALL_PREFIX=../../../$(llvm_dir) -DCMAKE_PREFIX_PATH=../../../$(llvm_dir) -GNinja ..
+      cmake --build .
+      cmake --build . --target install
+    displayName: 'Build win64 mingw binaries'
+  - publish: $(llvm_dir)
+    artifact: clang+llvm-9.0.0-win64-mingw
+    displayName: 'Upload binaries'
