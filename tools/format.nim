@@ -1,4 +1,4 @@
-import std/strutils, std/os, ../ensnare/private/os_utils
+import std/strutils, std/os, ensnare/private/os_utils
 
 proc get_files(dir: string): seq[string] =
    for entry in walk_dir(dir):
@@ -23,6 +23,6 @@ proc main =
    for file in get_files(param_str(1)):
       let (output, code) = exec("clang-format", [file])
       assert(code == 0, "failed for: " & file)
-      write_file(file, output.process[0 .. ^1])
+      write_file(file, output.process[0 .. ^2])
 
 when is_main_module: main()

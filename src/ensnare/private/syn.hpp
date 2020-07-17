@@ -13,4 +13,3 @@
 #define READ_ONLY(T, name)                                                                         \
    priv T _##name;                                                                                 \
    pub fn name() const -> const T& { return _##name; }
-

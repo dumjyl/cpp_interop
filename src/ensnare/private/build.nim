@@ -1,4 +1,4 @@
-import ../rt
+import ensnare/runtime
 
 from std/macros import error
 from std/strutils import strip_line_end, starts_with

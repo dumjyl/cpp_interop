@@ -6,7 +6,7 @@
 from std/os import is_absolute, split_file, `/`
 import private/macro_utils
 
-const rt_hpp = "rt.hpp"
+const rt_hpp = "ensnare/private/runtime.hpp"
 
 macro cpp_expr*(T, pattern, args): auto =
    let id = nskProc{"cpp_expr"}
@@ -26,7 +26,6 @@ macro cpp_expr*(T, pattern, args): auto =
 
 type LaunderClassBuf*[T] {.import_cpp: "ensnare::rt::LaunderClassBuf<'0>",
                            header: rt_hpp.} = object
-
 
 proc unsafe_destroy[T](self: var LaunderClassBuf[T])
    {.import_cpp: "#.unsafe_destroy(@)".}
@@ -150,8 +149,8 @@ type CppSrc* = object
 
 template `{}`*(Self: type[CppSrc], src: string): Self =
    var (dir, name, ext) = split_file(src)
-   if not is_absolute(dir):
-      dir = split_file(instantiation_info(-1, true).filename).dir
+   #if not is_absolute(dir):
+   #   dir = split_file(instantiation_info(-1, true).filename).dir
    CppSrc(dir: dir, name: name, ext: ext)
 
 proc import_name(ns_parts: openarray[NimNode]): string =

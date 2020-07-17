@@ -1,3 +1,4 @@
 /bin
 /nim.cfg
+/tests/units/gen
 *.o

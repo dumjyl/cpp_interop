@@ -2,6 +2,7 @@
 
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 
 #ifdef __ARM_ARCH_ISA_A64
@@ -9,12 +10,10 @@
 #elif
 #include <filesystem>
 #endif
-
-#include "rt.hpp"
-
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -22,65 +21,17 @@
 #include <vector>
 
 // preserve order
-#include "private/syn.hpp"
+#include "ensnare/private/bit_utils.hpp"
+#include "ensnare/private/runtime.hpp"
+#include "ensnare/private/syn.hpp"
+#include "ensnare/private/utils.hpp"
 
-namespace ensnare::ct {
-template <typename T> using Vec = std::vector<T>;
-
-template <typename T> using Opt = std::optional<T>;
-
-template <typename K, typename V> using Map = std::unordered_map<K, V>;
-
-using Str = std::string;
-
-template <typename T> using Node = std::shared_ptr<T>;
-
-template <typename... Variants> using Union = const std::variant<Variants...>;
-
-// Check if a `Union` is a thing. If it is you can `deref<T>(self)` it.
-template <typename T, typename... Variants> fn is(const Node<Union<Variants...>>& self) -> bool {
-   return std::holds_alternative<T, Variants...>(*self);
-}
-
-template <typename T, typename... Variants>
-fn deref(const Node<Union<Variants...>>& self) -> const T& {
-   return std::get<T, Variants...>(*self);
-}
-
-// Create a value ref counted node of type `Y` constructed from `X`.
-template <typename Y, typename... Args> fn node(Args... args) -> Node<Y> {
-   return std::make_shared<Y>(args...);
-}
-
-// Template recursion base case.
-template <typename... Args> fn write(std::ostream* out, Args... args) {}
-
-// Write some arguments to a output stream.
-template <typename Arg, typename... Args> fn write(std::ostream* out, Arg arg, Args... args) {
-   *out << arg;
-   write(out, args...);
-}
-
-// Write some arguments to an ouput stream with a newline.
-template <typename... Args> fn print(std::ostream* out, Args... args) {
-   write(out, args...);
-   write(out, '\n');
-}
-
-// Write some arguments to an `std::cout` with a newline.
-template <typename... Args> fn print(Args... args) { print(&std::cout, args...); }
-
-// Write some arguments to `std::cout` exit with error code 1.
-template <typename... Args> fn fatal [[noreturn]] (Args... args) {
-   print("fatal-error: ", args...);
-   std::exit(1);
-}
-
+namespace ensnare {
 // split by '\n' for line processing.
 fn split_newlines(const Str& str) -> Vec<Str> {
    Vec<Str> result;
    auto last = 0;
-   for (auto i = 0; i < str.size(); i++) {
+   for (auto i = 0; i < str.size(); i += 1) {
       if (str[i] == '\n') {
          Str str_result;
          for (auto j = last; j < i; j++) {
@@ -171,11 +122,13 @@ fn is_system_header(const Str& header) -> bool {
    return (header.size() > 2 && header[0] == '<' and header[header.size() - 1] == '>');
 }
 
-fn is_cpp_file(const Str& file) -> bool {
-   if (is_system_header(file)) {
-      return is_cpp_file(file.substr(1, file.size() - 2));
+fn extract_system_header(const Str& header) -> Str { return header.substr(1, header.size() - 2); }
+
+fn is_cpp_file(const Str& header) -> bool {
+   if (is_system_header(header)) {
+      return is_cpp_file(extract_system_header(header));
    } else {
-      fs::path path(file);
+      fs::path path(header);
       for (const auto& ext : {".hpp", ".cpp", ".h", ".c"}) {
          if (path.extension() == ext) {
             return true;
@@ -184,7 +137,39 @@ fn is_cpp_file(const Str& file) -> bool {
       return false;
    }
 }
+
+fn set_file_ext(const Str& file, const Str& ext) -> Str {
+   return fs::path(file).replace_extension(ext);
+}
 } // namespace os
+
+fn is_find_str(const char* data, std::size_t data_size, const Str& find) -> bool {
+   if (data_size >= find.size()) {
+      for (auto i = 0; i < find.size(); i += 1) {
+         if (data[i] != find[i]) {
+            return false;
+         }
+      }
+      return true;
+   } else {
+      return false;
+   }
+}
+
+fn replace(const Str& str, const Str& find, const Str& replace) -> Str {
+   Str result;
+   std::size_t i = 0;
+   while (i < str.size()) {
+      if (is_find_str(&str[i], str.size() - i - 1, find)) {
+         result += replace;
+         i += find.size();
+      } else {
+         result += str[i];
+         i += 1;
+      }
+   }
+   return result;
+}
 
 namespace cl {
 namespace cl = llvm::cl;
@@ -353,7 +338,7 @@ class VariableDecl {
       : _name(node<Sym>(name)), _cpp_name(name), _type(type) {}
 };
 
-// The cananonical types defined in rt.nim
+// The cananonical types defined in runtime.nim
 class Builtins {
    priv static fn init(const char* name) -> Node<Type> { return node<Type>(AtomType(name)); }
 
@@ -402,7 +387,7 @@ class Context {
    READ_ONLY(Vec<Node<VariableDecl>>, variable_decls); // Variables to output.
 
    pub const Config& cfg;
-   pub const Builtins builtins; // Atomic types defined in `rt.nim`
+   pub const Builtins builtins;
    pub Context(const Config& cfg, const clang::ASTContext& ast_ctx) : cfg(cfg), ast_ctx(ast_ctx) {}
 
    pub fn lookup(const clang::Decl& decl) const -> Opt<Node<Type>> {
@@ -688,7 +673,8 @@ MAP(const clang::ElaboratedType&) { return map(ctx, entity.getNamedType()); }
 // Currently as follows:
 // 1. Check `Context::type_map` via `lookup` for a cached type.
 //    This contains Decl pointer -> Node<Type> for already bound decls.
-// 2. If we did not find one we should
+// 2. If we did not find one we `wrap` the decl.
+// 3. If
 MAP(const clang::NamedDecl&) {
    auto type = ctx.lookup(entity);
    if (type) {
@@ -762,6 +748,31 @@ fn nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
    }
 }
 
+fn qualified_nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
+   // auto name = decl.getDeclName();
+   // switch (name.getNameKind()) {
+   // case clang::DeclarationName::NameKind::Identifier: {
+   //   return decl.getNameAsString();
+   //}
+   // case clang::DeclarationName::NameKind::ObjCZeroArgSelector:
+   // case clang::DeclarationName::NameKind::ObjCOneArgSelector:
+   // case clang::DeclarationName::NameKind::ObjCMultiArgSelector: {
+   //   fatal("obj-c not supported");
+   //}
+   // case clang::DeclarationName::NameKind::CXXConstructorName:
+   // case clang::DeclarationName::NameKind::CXXDestructorName:
+   // case clang::DeclarationName::NameKind::CXXConversionFunctionName:
+   // case clang::DeclarationName::NameKind::CXXOperatorName:
+   // case clang::DeclarationName::NameKind::CXXDeductionGuideName:
+   // case clang::DeclarationName::NameKind::CXXLiteralOperatorName:
+   // case clang::DeclarationName::NameKind::CXXUsingDirective:
+   // default:
+   //   decl.dump();
+   //   fatal("unhandled decl name");
+   //}
+   return replace(decl.getQualifiedNameAsString(), "::", "-");
+}
+
 // Retrieve all the information we have about a declaration.
 template <typename T> fn get_definition(const T& decl) -> const T& {
    auto result = decl.getDefinition();
@@ -774,7 +785,7 @@ template <typename T> fn get_definition(const T& decl) -> const T& {
 
 WRAP(Record) {
    // auto def = get_definition(decl);
-   RecordTypeDecl record(nim_name(ctx, decl), decl.getQualifiedNameAsString());
+   RecordTypeDecl record(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString());
    auto type_decl = node<TypeDecl>(record);
    ctx.set(decl, map(ctx, type_decl));
    ctx.add(type_decl);
@@ -787,15 +798,11 @@ WRAP(TypedefName) {
       decl.getLocation().dump(ctx.ast_ctx.getSourceManager());
       // This could be c++ `TypeAliasDecl` or a `TypedefDecl`.
       // Either way, we produce `type AliasName* = UnderlyingType`
-      AliasTypeDecl alias(decl.getNameAsString(), map(ctx, decl.getUnderlyingType()));
+      AliasTypeDecl alias(qualified_nim_name(ctx, decl), map(ctx, decl.getUnderlyingType()));
       auto type_decl = node<TypeDecl>(alias);
       ctx.set(decl, map(ctx, type_decl));
       ctx.add(type_decl);
    }
-}
-
-fn map_return_type(Context& ctx, const clang::FunctionDecl& decl) -> Node<Type> {
-   return map(ctx, decl.getReturnType());
 }
 
 fn wrap_formal(Context& ctx, const clang::ParmVarDecl& param) -> ParamDecl {
@@ -813,8 +820,9 @@ fn wrap_formals(Context& ctx, const clang::FunctionDecl& decl) -> Vec<ParamDecl>
 // Wrap a free non templated function.
 // It could be in a namespace.
 fn wrap_non_template(Context& ctx, const clang::FunctionDecl& decl) {
-   ctx.add(node<RoutineDecl>(FunctionDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
-                                          wrap_formals(ctx, decl), map_return_type(ctx, decl))));
+   ctx.add(
+       node<RoutineDecl>(FunctionDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
+                                      wrap_formals(ctx, decl), map(ctx, decl.getReturnType()))));
 }
 
 fn is_visible(const clang::VarDecl& decl) -> bool {
@@ -843,8 +851,10 @@ WRAP(Function) {
 }
 
 fn wrap_non_template(Context& ctx, const clang::CXXConstructorDecl& decl) {
-   ctx.add(node<RoutineDecl>(ConstructorDecl(decl.getQualifiedNameAsString(),
-                                             map(ctx, decl.getParent()), wrap_formals(ctx, decl))));
+   if (ctx.access_filter(decl)) {
+      ctx.add(node<RoutineDecl>(ConstructorDecl(
+          decl.getQualifiedNameAsString(), map(ctx, decl.getParent()), wrap_formals(ctx, decl))));
+   }
 }
 
 WRAP(CXXConstructor) {
@@ -862,9 +872,11 @@ WRAP(CXXConstructor) {
 }
 
 fn wrap_non_template(Context& ctx, const clang::CXXMethodDecl& decl) {
-   ctx.add(node<RoutineDecl>(MethodDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
-                                        map(ctx, decl.getParent()), wrap_formals(ctx, decl),
-                                        map_return_type(ctx, decl))));
+   if (ctx.access_filter(decl)) {
+      ctx.add(node<RoutineDecl>(MethodDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
+                                           map(ctx, decl.getParent()), wrap_formals(ctx, decl),
+                                           map(ctx, decl.getReturnType()))));
+   }
 }
 
 WRAP(CXXMethod) {
@@ -988,7 +1000,7 @@ namespace rendering {
 const std::size_t indent_size = 3;
 fn indent() -> Str {
    Str result;
-   for (auto i = 0; i < indent_size; i++) {
+   for (auto i = 0; i < indent_size; i += 1) {
       result += ' ';
    }
    return result;
@@ -1004,7 +1016,53 @@ fn indent(const Str& str) -> Str {
 
 fn render(const Node<Type>& type) -> Str;
 
-fn render(const Node<Sym>& sym) -> Str { return sym->latest(); }
+const llvm::StringSet nim_keywords(
+    {"addr",      "and",     "as",    "asm",      "bind",      "block",  "break",   "case",
+     "cast",      "concept", "const", "continue", "converter", "defer",  "discard", "distinct",
+     "div",       "do",      "elif",  "else",     "end",       "enum",   "except",  "export",
+     "finally",   "for",     "from",  "func",     "if",        "import", "in",      "include",
+     "interface", "is",      "isnot", "iterator", "let",       "macro",  "method",  "mixin",
+     "mod",       "nil",     "not",   "notin",    "object",    "of",     "or",      "out",
+     "proc",      "ptr",     "raise", "ref",      "return",    "shl",    "shr",     "static",
+     "template",  "try",     "tuple", "type",     "using",     "var",    "when",    "while",
+     "xor",       "yield"});
+
+fn is_nim_keyword(const Str& str) -> bool { return nim_keywords.count(str) == 1; }
+
+fn incl(CharSet& chars, char low, char high) {
+   for (auto i = static_cast<std::size_t>(low); i <= high; i += 1) {
+      chars.incl(static_cast<char>(i));
+   }
+}
+
+fn ident_chars() -> CharSet {
+   CharSet result;
+   incl(result, 'A', 'Z');
+   incl(result, 'a', 'z');
+   incl(result, '0', '9');
+   result.incl('_');
+   return result;
+}
+
+fn is_ident_chars(const Str& str) -> bool {
+   for (auto c : str) {
+      if (!ident_chars().contains(c)) {
+         return false;
+      }
+   }
+   return true;
+}
+
+fn needs_stropping(const Str& sym) { return is_nim_keyword(sym) || !is_ident_chars(sym); }
+
+fn render(const Node<Sym>& sym) -> Str {
+   auto result = sym->latest();
+   if (needs_stropping(result)) {
+      return "`" + result + "`";
+   } else {
+      return result;
+   }
+}
 
 fn render(const AtomType& typ) -> Str { return render(typ.name()); }
 
@@ -1059,7 +1117,10 @@ fn render(const EnumTypeDecl& decl) -> Str {
    return result;
 }
 
-fn render(const RecordTypeDecl& decl) -> Str { return render(decl.name()) + "* = object\n"; }
+fn render(const RecordTypeDecl& decl) -> Str {
+   return render(decl.name()) + "* " + render_pragmas({import_cpp(decl.cpp_name())}) +
+          " = object\n";
+}
 
 fn render(const Node<TypeDecl>& decl) -> Str {
    if (is<AliasTypeDecl>(decl)) {
@@ -1106,7 +1167,6 @@ fn render(const ConstructorDecl& decl) -> Str {
 }
 
 fn render(const MethodDecl& decl) -> Str {
-
    Str result = "proc " + render(decl.name()) + "*(self: ";
    result += render(decl.self());
    for (const auto& formal : decl.formals()) {
@@ -1137,7 +1197,6 @@ fn render(const Node<VariableDecl>& decl) -> Str {
    return render(decl->name()) + "* " + render_pragmas({import_cpp(decl->cpp_name())}) + ": " +
           render(decl->type()) + "\n";
 }
-
 } // namespace rendering
 
 // Instantiate this class to do the work. The Config will grow in complexity to support
@@ -1160,29 +1219,28 @@ class BindAction : public clang::RecursiveASTVisitor<BindAction> {
 
    // Render and write out our decls.
    priv fn finalize() {
-      Str output;
-      output += "# generated bindings --- machine dependent\n";
+      Str output = "import ensnare/runtime\n";
       if (ctx.type_decls().size() != 0) {
-         output += "# type section\n";
+         output += "\n# type section\n\n";
          output += "type\n";
          for (const auto& type_decl : ctx.type_decls()) {
             output += rendering::indent(rendering::render(type_decl));
          }
       }
       if (ctx.routine_decls().size() != 0) {
-         output += "# function section\n";
+         output += "\n# function section\n\n";
          for (const auto& routine_decl : ctx.routine_decls()) {
             output += rendering::render(routine_decl);
          }
       }
       if (ctx.variable_decls().size() != 0) {
-         output += "# variable section\n";
+         output += "\n# variable section\n\n";
          output += "var\n";
          for (const auto& variable_decl : ctx.variable_decls()) {
             output += rendering::indent(rendering::render(variable_decl));
          }
       }
-      os::write_file(ctx.cfg.output() + ".nim", output);
+      os::write_file(os::set_file_ext(ctx.cfg.output(), ".nim"), output);
    }
 
    pub BindAction(const Config& cfg) : cfg(cfg), tu(parse_tu()), ctx(cfg, tu->getASTContext()) {
@@ -1209,7 +1267,6 @@ fn run(int argc, const char* argv[]) {
    const Config cfg(argc, argv);
    BindAction action(cfg);
 }
-} // namespace ensnare::ct
+} // namespace ensnare
 
-#include "private/undef_syn.hpp"
-
+#include "ensnare/private/undef_syn.hpp"

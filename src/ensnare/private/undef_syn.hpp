@@ -4,4 +4,3 @@
 #undef branch
 #undef READ_ONLY
 #undef NO_COPY
-

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "private/syn.hpp"
+#include "ensnare/private/syn.hpp"
 
 #include <memory>
 #include <type_traits>
@@ -50,5 +50,4 @@ template <typename T> class LaunderClassBuf {
 };
 } // namespace ensnare::rt
 
-#include "private/undef_syn.hpp"
-
+#include "ensnare/private/undef_syn.hpp"
