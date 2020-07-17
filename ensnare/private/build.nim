@@ -59,6 +59,10 @@ proc config(arg: string): string =
 template flags* =
    cpp_include_dir(config"includedir")
    cpp_forward_compiler("-fno-rtti")
+   cpp_forward_compiler("-D_GNU_SOURCE")
+   cpp_forward_compiler("-D__STDC_CONSTANT_MACROS")
+   cpp_forward_compiler("-D__STDC_FORMAT_MACROS")
+   cpp_forward_compiler("-D__STDC_LIMIT_MACROS")
    cpp_link_lib(@clang_libs & @llvm_libs)
    cpp_link_lib("omptarget")
    cpp_link_lib("stdc++fs")

@@ -44,13 +44,9 @@ template <typename T> class LaunderClassBuf {
    }
 
    // A binding generator would only expose this if the type supported it.
-   pub fn unsafe_copy() -> LaunderClassBuf<T> {
-      return this->read_buf();
-   }
+   pub fn unsafe_copy() -> LaunderClassBuf<T> { return this->read_buf(); }
 
-   pub fn unsafe_deref() -> T& {
-      return this->read_buf();
-   }
+   pub fn unsafe_deref() -> T& { return this->read_buf(); }
 };
 } // namespace ensnare::rt
 

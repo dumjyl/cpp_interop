@@ -192,3 +192,6 @@ macro cpp_link_lib*(libraries: static[openarray[string]]) =
    result = nnkStmtList{}
    for library in libraries:
       result.add(!`bind cpp_link_lib`(`library.lit`))
+
+template emit_cpp*(src: static[string]) =
+   {.emit: src.}

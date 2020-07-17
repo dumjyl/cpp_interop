@@ -37,6 +37,7 @@ template <typename T> using Node = std::shared_ptr<T>;
 
 template <typename... Variants> using Union = const std::variant<Variants...>;
 
+// Check if a `Union` is a thing. If it is you can `deref<T>(self)` it.
 template <typename T, typename... Variants> fn is(const Node<Union<Variants...>>& self) -> bool {
    return std::holds_alternative<T, Variants...>(*self);
 }
@@ -67,9 +68,7 @@ template <typename... Args> fn print(std::ostream* out, Args... args) {
 }
 
 // Write some arguments to an `std::cout` with a newline.
-template <typename... Args> fn print(Args... args) {
-   print(&std::cout, args...);
-}
+template <typename... Args> fn print(Args... args) { print(&std::cout, args...); }
 
 // Write some arguments to `std::cout` exit with error code 1.
 template <typename... Args> fn fatal [[noreturn]] (Args... args) {
@@ -124,9 +123,7 @@ fn write_file(const Str& path, const Str& contents) -> void {
 }
 
 // Get a suitable location
-fn temp_file(const Str& name) -> Str {
-   return fs::temp_directory_path() / name;
-}
+fn temp_file(const Str& name) -> Str { return fs::temp_directory_path() / name; }
 
 // `popen` a process and return its exit code and output if process opening and closing succeeded.
 // This is probably not cross platform.
@@ -193,7 +190,7 @@ namespace cl {
 namespace cl = llvm::cl;
 cl::opt<bool> disable_includes("disable-includes",
                                cl::desc("do not gather system includes. FIXME: not implimented"));
-cl::opt<Str> name(cl::Positional, cl::desc("wrapper name"));
+cl::opt<Str> output(cl::Positional, cl::desc("output wrapper name/path"));
 cl::list<Str> args(cl::ConsumeAfter, cl::desc("clang args..."));
 } // namespace cl
 
@@ -201,28 +198,28 @@ class Config {
    // NO_COPY(Config);
 
    READ_ONLY(Vec<Str>, headers);
-   READ_ONLY(Str, name);
+   READ_ONLY(Str, output);
    READ_ONLY(Vec<Str>, clang_args);
 
    pub Config(int argc, const char* argv[]) {
       llvm::cl::ParseCommandLineOptions(argc, argv);
-      this->_name = cl::name;
+      _output = cl::output;
       for (const auto& arg : cl::args) {
          if (os::is_cpp_file(arg)) {
-            this->_headers.push_back(arg);
+            _headers.push_back(arg);
          } else {
-            this->_clang_args.push_back(arg);
+            _clang_args.push_back(arg);
          }
       }
    };
 
-   // A header file with all the `--header` args added together.
+   // A header file with all the headers added together.
    pub fn header_file() const -> Str {
-      if (this->_headers.size() == 0) {
+      if (_headers.size() == 0) {
          fatal("no headers given");
       } else {
          Str result;
-         for (const auto& header : this->_headers) {
+         for (const auto& header : _headers) {
             result += "#include ";
             if (os::is_system_header(header)) {
                result += header;
@@ -239,12 +236,8 @@ class Config {
 // This is reference counted string class with a history. It should only be used like `Node<Sym`>.
 class Sym {
    priv Vec<Str> _detail;
-   pub Sym(const Str& name) {
-      this->_detail.push_back(name);
-   }
-   pub fn latest() -> Str {
-      return _detail.back();
-   }
+   pub Sym(const Str& name) { _detail.push_back(name); }
+   pub fn latest() -> Str { return _detail.back(); }
 };
 
 class AtomType;
@@ -273,7 +266,6 @@ class RefType {
    pub RefType(Node<Type> pointee) : _pointee(pointee) {}
 };
 
-// This class should only come on the right hand side of a AliasTypeDecl.
 class OpaqueType {};
 
 // A `type Foo = Bar[X, Y]` like declaration.
@@ -308,26 +300,50 @@ class RecordTypeDecl {
 
 using TypeDecl = Union<AliasTypeDecl, EnumTypeDecl, RecordTypeDecl>;
 
-class FunctionParamDecl {
+class ParamDecl {
    READ_ONLY(Node<Sym>, name);
    READ_ONLY(Node<Type>, type);
    // READ_ONLY(Opt<Node<Expr>>, expr);
-   pub FunctionParamDecl(const Str name, const Node<Type> type)
-      : _name(node<Sym>(name)), _type(type) {}
+   pub ParamDecl(const Str name, const Node<Type> type) : _name(node<Sym>(name)), _type(type) {}
 };
 
 // A non method function declaration.
-class FreeFunctionDecl {
+class FunctionDecl {
    READ_ONLY(Node<Sym>, name);
    READ_ONLY(Str, cpp_name);
-   READ_ONLY(Vec<FunctionParamDecl>, formals);
+   READ_ONLY(Vec<ParamDecl>, formals);
    READ_ONLY(Opt<Node<Type>>, return_type);
-   pub FreeFunctionDecl(const Str name, const Str cpp_name, const Vec<FunctionParamDecl> formals,
-                        const Opt<Node<Type>> return_type)
+   pub FunctionDecl(const Str name, const Str cpp_name, const Vec<ParamDecl> formals,
+                    const Opt<Node<Type>> return_type)
       : _name(node<Sym>(name)), _cpp_name(cpp_name), _formals(formals), _return_type(return_type) {}
 };
 
-using FunctionDecl = Union<FreeFunctionDecl>;
+// A c++ class/struct/union constructor
+class ConstructorDecl {
+   READ_ONLY(Str, cpp_name);
+   READ_ONLY(Node<Type>, self);
+   READ_ONLY(Vec<ParamDecl>, formals);
+   pub ConstructorDecl(const Str cpp_name, const Node<Type> self, const Vec<ParamDecl> formals)
+      : _cpp_name(cpp_name), _self(self), _formals(formals) {}
+};
+
+// A c++ class/struct/union method
+class MethodDecl {
+   READ_ONLY(Node<Sym>, name);
+   READ_ONLY(Str, cpp_name);
+   READ_ONLY(Node<Type>, self);
+   READ_ONLY(Vec<ParamDecl>, formals);
+   READ_ONLY(Opt<Node<Type>>, return_type);
+   pub MethodDecl(const Str name, const Str cpp_name, const Node<Type> self,
+                  const Vec<ParamDecl> formals, const Opt<Node<Type>> return_type)
+      : _name(node<Sym>(name)),
+        _cpp_name(cpp_name),
+        _self(self),
+        _formals(formals),
+        _return_type(return_type) {}
+};
+
+using RoutineDecl = Union<FunctionDecl, ConstructorDecl, MethodDecl>;
 
 class VariableDecl {
    READ_ONLY(Node<Sym>, name);
@@ -339,9 +355,7 @@ class VariableDecl {
 
 // The cananonical types defined in rt.nim
 class Builtins {
-   priv static fn init(const char* name) -> Node<Type> {
-      return node<Type>(AtomType(name));
-   }
+   priv static fn init(const char* name) -> Node<Type> { return node<Type>(AtomType(name)); }
 
    pub const Node<Type> _schar = Builtins::init("cpp_schar");
    pub const Node<Type> _short = Builtins::init("cpp_short");
@@ -384,48 +398,42 @@ class Context {
    priv Map<const clang::Decl*, Node<Type>>
        type_lookup;                            // For mapping bound declarations to exisiting types.
    READ_ONLY(Vec<Node<TypeDecl>>, type_decls); // Types to output.
-   READ_ONLY(Vec<Node<FunctionDecl>>, function_decls); // Functions to output.
+   READ_ONLY(Vec<Node<RoutineDecl>>, routine_decls);   // Functions to output.
    READ_ONLY(Vec<Node<VariableDecl>>, variable_decls); // Variables to output.
 
    pub const Config& cfg;
    pub const Builtins builtins; // Atomic types defined in `rt.nim`
    pub Context(const Config& cfg, const clang::ASTContext& ast_ctx) : cfg(cfg), ast_ctx(ast_ctx) {}
 
-   pub fn lookup(const clang::Decl* decl) const -> Opt<Node<Type>> {
-      auto decl_type = this->type_lookup.find(decl);
-      if (decl_type == this->type_lookup.end()) {
+   pub fn lookup(const clang::Decl& decl) const -> Opt<Node<Type>> {
+      auto decl_type = type_lookup.find(&decl);
+      if (decl_type == type_lookup.end()) {
          return {};
       } else {
          return decl_type->second;
       }
    }
 
-   pub fn set(const clang::Decl* decl, Node<Type> type) {
-      auto maybe_type = this->lookup(decl);
+   pub fn set(const clang::Decl& decl, const Node<Type> type) {
+      auto maybe_type = lookup(decl);
       if (maybe_type) {
          fatal("FIXME: duplicate set");
       } else {
-         this->type_lookup[decl] = type;
+         type_lookup[&decl] = type;
       }
    }
 
-   pub fn add(Node<TypeDecl> decl) {
-      this->_type_decls.push_back(decl);
-   }
+   pub fn add(const Node<TypeDecl> decl) { _type_decls.push_back(decl); }
 
-   pub fn add(Node<FunctionDecl> decl) {
-      this->_function_decls.push_back(decl);
-   }
+   pub fn add(const Node<RoutineDecl> decl) { _routine_decls.push_back(decl); }
 
-   pub fn add(Node<VariableDecl> decl) {
-      this->_variable_decls.push_back(decl);
-   }
+   pub fn add(const Node<VariableDecl> decl) { _variable_decls.push_back(decl); }
 
-   pub fn access_filter(const clang::Decl* decl) -> bool {
+   pub fn access_filter(const clang::Decl& decl) const -> bool {
       // AS_protected
       // AS_private
       // AS_none
-      return decl->getAccess() == clang::AS_public;
+      return decl.getAccess() == clang::AS_public;
    }
 };
 
@@ -436,18 +444,26 @@ class Context {
 //`QualType` or / even some kinds of `Stmt` (a decltype for example).
 //
 
-#define WRAP(T) fn wrap(Context& ctx, const clang::T##Decl* decl) -> void
+#define WRAP(T) fn wrap(Context& ctx, const clang::T##Decl& decl) -> void
 
 #define MAP(T) fn map(Context& ctx, T entity) -> Node<Type>
 
-fn wrap(Context& ctx, const clang::Decl* decl) -> void;
-MAP(const clang::Decl*);
-MAP(const clang::Type*);
+fn wrap(Context& ctx, const clang::Decl& decl) -> void;
+MAP(const clang::Decl&);
+MAP(const clang::Type&);
+
+template <typename T> fn map(Context& ctx, const T* entity) {
+   if (entity) {
+      return map(ctx, *entity);
+   } else {
+      fatal("tried to map a null entity");
+   }
+}
 
 // Maps to an atomic type of some kind. Many of these are obscure and
 // unsupported.
-MAP(const clang::BuiltinType*) {
-   switch (entity->getKind()) {
+MAP(const clang::BuiltinType&) {
+   switch (entity.getKind()) {
    case clang::BuiltinType::Kind::OCLImage1dRO:
    case clang::BuiltinType::Kind::OCLImage1dArrayRO:
    case clang::BuiltinType::Kind::OCLImage1dBufferRO:
@@ -562,9 +578,9 @@ MAP(const clang::BuiltinType*) {
    case clang::BuiltinType::Kind::ARCUnbridgedCast:
    case clang::BuiltinType::Kind::BuiltinFn:
    case clang::BuiltinType::Kind::OMPArraySection: {
-      entity->dump();
+      entity.dump();
       fatal("unhandled builtin type: ",
-            entity->getNameAsCString(clang::PrintingPolicy(clang::LangOptions())));
+            entity.getNameAsCString(clang::PrintingPolicy(clang::LangOptions())));
    }
    case clang::BuiltinType::Kind::SChar: // 'signed char', explicitly qualified
       return ctx.builtins._schar;
@@ -628,9 +644,9 @@ MAP(const clang::BuiltinType*) {
       pub TypeNode _byte = Builtins::init("cpp_byte");
    */
    default:
-      entity->dump();
-      fatal("unreachable builtin type: ",
-            entity->getNameAsCString(clang::PrintingPolicy(clang::LangOptions())));
+      entity.dump();
+      fatal("unreachable: builtin type: ",
+            entity.getNameAsCString(clang::PrintingPolicy(clang::LangOptions())));
    }
 } // namespace ensnare::ct
 
@@ -639,13 +655,18 @@ MAP(clang::QualType) {
    if (entity.isRestrictQualified() || entity.isVolatileQualified()) {
       fatal("volatile and restrict qualifiers unsupported");
    }
-   auto result = map(ctx, entity.getTypePtr());
-   if (entity.isConstQualified()) { // FIXME: `isLocalConstQualified`: do
-                                    // we care about local vs non-local?
-                                    // This will be usefull later.
-                                    // result->flag_const();
+   auto type = entity.getTypePtr();
+   if (type) {
+      auto result = map(ctx, *type);
+      if (entity.isConstQualified()) { // FIXME: `isLocalConstQualified`: do
+                                       // we care about local vs non-local?
+                                       // This will be usefull later.
+                                       // result->flag_const();
+      }
+      return result;
+   } else {
+      fatal("QualType inner type was null");
    }
-   return result;
 }
 
 MAP(Node<TypeDecl>) {
@@ -656,15 +677,19 @@ MAP(Node<TypeDecl>) {
    } else if (is<RecordTypeDecl>(entity)) {
       return node<Type>(AtomType(deref<RecordTypeDecl>(entity).name()));
    } else {
-      fatal("unreachable");
+      fatal("unreachable: TypeDecl");
    }
 }
 
-MAP(const clang::ElaboratedType*) {
-   return map(ctx, entity->getNamedType());
-}
+MAP(const clang::ElaboratedType&) { return map(ctx, entity.getNamedType()); }
 
-MAP(const clang::NamedDecl*) {
+// Here we could be looking up an aliased type, a record field, a parameter.
+// We need a declaration if we want to expose this as a type.
+// Currently as follows:
+// 1. Check `Context::type_map` via `lookup` for a cached type.
+//    This contains Decl pointer -> Node<Type> for already bound decls.
+// 2. If we did not find one we should
+MAP(const clang::NamedDecl&) {
    auto type = ctx.lookup(entity);
    if (type) {
       return *type;
@@ -674,7 +699,7 @@ MAP(const clang::NamedDecl*) {
       if (type) {
          return *type;
       } else {
-         entity->dump();
+         entity.dump();
          fatal("failed to map type");
       }
    }
@@ -683,27 +708,17 @@ MAP(const clang::NamedDecl*) {
 // FIXME: add the restrict_wrap counter.
 
 // If a `Type` has a `Decl` representation, always map that. It seems to work.
-MAP(const clang::TypedefType*) {
-   return map(ctx, entity->getDecl());
-}
+MAP(const clang::TypedefType&) { return map(ctx, entity.getDecl()); }
 
-MAP(const clang::RecordType*) {
-   return map(ctx, entity->getDecl());
-}
+MAP(const clang::RecordType&) { return map(ctx, entity.getDecl()); }
 
-MAP(const clang::EnumType*) {
-   return map(ctx, entity->getDecl());
-}
+MAP(const clang::EnumType&) { return map(ctx, entity.getDecl()); }
 
-MAP(const clang::PointerType*) {
-   return node<Type>(PtrType(map(ctx, entity->getPointeeType())));
-}
+MAP(const clang::PointerType&) { return node<Type>(PtrType(map(ctx, entity.getPointeeType()))); }
 
-MAP(const clang::ReferenceType*) {
-   return node<Type>(RefType(map(ctx, entity->getPointeeType())));
-}
+MAP(const clang::ReferenceType&) { return node<Type>(RefType(map(ctx, entity.getPointeeType()))); }
 
-MAP(const clang::VectorType*) {
+MAP(const clang::VectorType&) {
    // The hope is that this is an aliased type as part of `typedef` / `using`
    // and the internals don't matter.
    return node<Type>(OpaqueType());
@@ -720,16 +735,14 @@ MAP(const clang::VectorType*) {
    // }
 }
 
-MAP(const clang::ParenType*) {
-   return map(ctx, entity->getInnerType());
-}
+MAP(const clang::ParenType&) { return map(ctx, entity.getInnerType()); }
 
 // return a suitable name from a named declaration.
-fn nim_name(Context& ctx, const clang::NamedDecl* decl) -> Str {
-   auto name = decl->getDeclName();
+fn nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
+   auto name = decl.getDeclName();
    switch (name.getNameKind()) {
    case clang::DeclarationName::NameKind::Identifier: {
-      return decl->getNameAsString();
+      return decl.getNameAsString();
    }
    case clang::DeclarationName::NameKind::ObjCZeroArgSelector:
    case clang::DeclarationName::NameKind::ObjCOneArgSelector:
@@ -744,15 +757,16 @@ fn nim_name(Context& ctx, const clang::NamedDecl* decl) -> Str {
    case clang::DeclarationName::NameKind::CXXLiteralOperatorName:
    case clang::DeclarationName::NameKind::CXXUsingDirective:
    default:
-      decl->dump();
+      decl.dump();
       fatal("unhandled decl name");
    }
 }
 
 // Retrieve all the information we have about a declaration.
-template <typename T> fn get_definition(const T* decl) -> const T* {
-   if (auto def = decl->getDefinition()) {
-      return def;
+template <typename T> fn get_definition(const T& decl) -> const T& {
+   auto result = decl.getDefinition();
+   if (result) {
+      return *result;
    } else {
       return decl;
    }
@@ -760,53 +774,62 @@ template <typename T> fn get_definition(const T* decl) -> const T* {
 
 WRAP(Record) {
    // auto def = get_definition(decl);
-   RecordTypeDecl record(nim_name(ctx, decl), decl->getQualifiedNameAsString());
+   RecordTypeDecl record(nim_name(ctx, decl), decl.getQualifiedNameAsString());
    auto type_decl = node<TypeDecl>(record);
    ctx.set(decl, map(ctx, type_decl));
    ctx.add(type_decl);
 }
 
 WRAP(TypedefName) {
-   if (decl->getKind() == clang::Decl::Kind::ObjCTypeParam) {
+   if (decl.getKind() == clang::Decl::Kind::ObjCTypeParam) {
       fatal("obj-c is unsupported");
    } else {
-      decl->getLocation().dump(ctx.ast_ctx.getSourceManager());
+      decl.getLocation().dump(ctx.ast_ctx.getSourceManager());
       // This could be c++ `TypeAliasDecl` or a `TypedefDecl`.
       // Either way, we produce `type AliasName* = UnderlyingType`
-      AliasTypeDecl alias(decl->getNameAsString(), map(ctx, decl->getUnderlyingType()));
+      AliasTypeDecl alias(decl.getNameAsString(), map(ctx, decl.getUnderlyingType()));
       auto type_decl = node<TypeDecl>(alias);
       ctx.set(decl, map(ctx, type_decl));
       ctx.add(type_decl);
    }
 }
 
-fn wrap_non_template(Context& ctx, const clang::FunctionDecl* decl) {
-   Vec<FunctionParamDecl> formals;
-   for (auto param : decl->parameters()) {
-      formals.emplace_back(param->getNameAsString(), map(ctx, param->getType()));
-   }
-   Opt<Node<Type>> return_type = map(ctx, decl->getReturnType());
-   FreeFunctionDecl free_func(decl->getNameAsString(), decl->getQualifiedNameAsString(), formals,
-                              return_type);
-   auto func = node<FunctionDecl>(free_func);
-   ctx.add(func);
+fn map_return_type(Context& ctx, const clang::FunctionDecl& decl) -> Node<Type> {
+   return map(ctx, decl.getReturnType());
 }
 
-fn is_visible(const clang::VarDecl* decl) -> bool {
-   return decl->hasGlobalStorage() && !decl;
+fn wrap_formal(Context& ctx, const clang::ParmVarDecl& param) -> ParamDecl {
+   return ParamDecl(param.getNameAsString(), map(ctx, param.getType()));
+}
+
+fn wrap_formals(Context& ctx, const clang::FunctionDecl& decl) -> Vec<ParamDecl> {
+   Vec<ParamDecl> result;
+   for (auto param : decl.parameters()) {
+      result.push_back(wrap_formal(ctx, *param));
+   }
+   return result;
+}
+
+// Wrap a free non templated function.
+// It could be in a namespace.
+fn wrap_non_template(Context& ctx, const clang::FunctionDecl& decl) {
+   ctx.add(node<RoutineDecl>(FunctionDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
+                                          wrap_formals(ctx, decl), map_return_type(ctx, decl))));
+}
+
+fn is_visible(const clang::VarDecl& decl) -> bool {
+   return decl.hasGlobalStorage() && !decl.isStaticLocal();
 }
 
 WRAP(Var) {
    if (ctx.access_filter(decl) && is_visible(decl)) {
-      ctx.add(node<VariableDecl>(decl->getNameAsString(), decl->getQualifiedNameAsString(),
-                                 map(ctx, decl->getType())));
+      ctx.add(node<VariableDecl>(decl.getNameAsString(), decl.getQualifiedNameAsString(),
+                                 map(ctx, decl.getType())));
    }
 }
 
 WRAP(Function) {
-   // This is just a plain function. Not a method of some kind.
-   // It could be templated though.
-   switch (decl->getTemplatedKind()) {
+   switch (decl.getTemplatedKind()) {
    case clang::FunctionDecl::TK_NonTemplate:
       wrap_non_template(ctx, decl);
       break;
@@ -819,6 +842,45 @@ WRAP(Function) {
    }
 }
 
+fn wrap_non_template(Context& ctx, const clang::CXXConstructorDecl& decl) {
+   ctx.add(node<RoutineDecl>(ConstructorDecl(decl.getQualifiedNameAsString(),
+                                             map(ctx, decl.getParent()), wrap_formals(ctx, decl))));
+}
+
+WRAP(CXXConstructor) {
+   switch (decl.getTemplatedKind()) {
+   case clang::FunctionDecl::TK_NonTemplate:
+      wrap_non_template(ctx, decl);
+      break;
+   case clang::FunctionDecl::TK_FunctionTemplate:
+   case clang::FunctionDecl::TK_MemberSpecialization:
+   case clang::FunctionDecl::TK_FunctionTemplateSpecialization:
+   case clang::FunctionDecl::TK_DependentFunctionTemplateSpecialization: {
+      fatal("unhandled template constructor variety");
+   }
+   }
+}
+
+fn wrap_non_template(Context& ctx, const clang::CXXMethodDecl& decl) {
+   ctx.add(node<RoutineDecl>(MethodDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
+                                        map(ctx, decl.getParent()), wrap_formals(ctx, decl),
+                                        map_return_type(ctx, decl))));
+}
+
+WRAP(CXXMethod) {
+   switch (decl.getTemplatedKind()) {
+   case clang::FunctionDecl::TK_NonTemplate:
+      wrap_non_template(ctx, decl);
+      break;
+   case clang::FunctionDecl::TK_FunctionTemplate:
+   case clang::FunctionDecl::TK_MemberSpecialization:
+   case clang::FunctionDecl::TK_FunctionTemplateSpecialization:
+   case clang::FunctionDecl::TK_DependentFunctionTemplateSpecialization: {
+      fatal("unhandled template constructor variety");
+   }
+   }
+}
+
 // --- dispatching, presumably the hot path.
 
 #define DISPATCH(kind)                                                                             \
@@ -826,8 +888,8 @@ WRAP(Function) {
       return map(ctx, llvm::cast<clang::kind##Type>(entity));                                      \
    }
 
-MAP(const clang::Type*) {
-   switch (entity->getTypeClass()) {
+MAP(const clang::Type&) {
+   switch (entity.getTypeClass()) {
       DISPATCH(Builtin);
       DISPATCH(Elaborated);
       DISPATCH(Record);
@@ -839,8 +901,8 @@ MAP(const clang::Type*) {
       DISPATCH(Vector);
       DISPATCH(Paren);
    default:
-      entity->dump();
-      fatal("unhandled mapping: ", entity->getTypeClassName());
+      entity.dump();
+      fatal("unhandled mapping: ", entity.getTypeClassName());
    }
 }
 
@@ -870,25 +932,26 @@ MAP(const clang::Type*) {
       break;                                                                                       \
    }
 
-fn wrap(Context& ctx, const clang::Decl* decl) -> void {
-   switch (decl->getKind()) {
+fn wrap(Context& ctx, const clang::Decl& decl) -> void {
+   switch (decl.getKind()) {
       DISCARD(TranslationUnit);
       DISCARD(Namespace);
       DISCARD(Field);
       DISCARD(ParmVar);
+      DISCARD(AccessSpec);
       DISPATCH_ANY(TypedefName);
       DISPATCH_ANY(Record);
       DISPATCH(Function);
+      DISPATCH(CXXMethod);
+      DISPATCH(CXXConstructor);
       DISPATCH(Var);
    default:
-      decl->dump();
-      fatal("unhandled wrapping: ", decl->getDeclKindName(), "Decl");
+      decl.dump();
+      fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
    }
 }
 // Get a suitable location to store temp file.
-fn temp(Str name) -> Str {
-   return os::temp_file("ensnare_system_includes_" + name);
-}
+fn temp(Str name) -> Str { return os::temp_file("ensnare_system_includes_" + name); }
 
 // Get some verbose compiler logs to parse.
 fn get_raw_include_paths() -> Str {
@@ -941,25 +1004,15 @@ fn indent(const Str& str) -> Str {
 
 fn render(const Node<Type>& type) -> Str;
 
-fn render(const Node<Sym>& sym) -> Str {
-   return sym->latest();
-}
+fn render(const Node<Sym>& sym) -> Str { return sym->latest(); }
 
-fn render(const AtomType& typ) -> Str {
-   return render(typ.name());
-}
+fn render(const AtomType& typ) -> Str { return render(typ.name()); }
 
-fn render(const PtrType& typ) -> Str {
-   return "ptr " + render(typ.pointee());
-}
+fn render(const PtrType& typ) -> Str { return "ptr " + render(typ.pointee()); }
 
-fn render(const RefType& typ) -> Str {
-   return "var " + render(typ.pointee());
-}
+fn render(const RefType& typ) -> Str { return "var " + render(typ.pointee()); }
 
-fn render(const OpaqueType& typ) -> Str {
-   return "object";
-}
+fn render(const OpaqueType& typ) -> Str { return "object"; }
 
 fn render(const Node<Type>& type) -> Str {
    if (is<AtomType>(type)) {
@@ -971,7 +1024,7 @@ fn render(const Node<Type>& type) -> Str {
    } else if (is<OpaqueType>(type)) {
       return render(deref<OpaqueType>(type));
    } else {
-      fatal("unreachable");
+      fatal("unreachable: render(Type)");
    }
 }
 
@@ -987,21 +1040,15 @@ fn render_pragmas(const Vec<Str>& pragmas) -> Str {
    return result;
 }
 
-fn render_colon(const Str& a, const Str& b) -> Str {
-   return a + ": " + b;
-}
+fn render_colon(const Str& a, const Str& b) -> Str { return a + ": " + b; }
 
-fn import_cpp(const Str& pattern) -> Str {
-   return "import_cpp: \"" + pattern + "\"";
-}
+fn import_cpp(const Str& pattern) -> Str { return "import_cpp: \"" + pattern + "\""; }
 
 fn render(const AliasTypeDecl& decl) -> Str {
    return render(decl.name()) + "* = " + render(decl.type()) + "\n";
 }
 
-fn render(const EnumFieldDecl& decl) -> Str {
-   return indent() + render(decl.name()) + '\n';
-}
+fn render(const EnumFieldDecl& decl) -> Str { return indent() + render(decl.name()) + '\n'; }
 
 fn render(const EnumTypeDecl& decl) -> Str {
    Str result =
@@ -1012,9 +1059,7 @@ fn render(const EnumTypeDecl& decl) -> Str {
    return result;
 }
 
-fn render(const RecordTypeDecl& decl) -> Str {
-   return render(decl.name()) + "* = object\n";
-}
+fn render(const RecordTypeDecl& decl) -> Str { return render(decl.name()) + "* = object\n"; }
 
 fn render(const Node<TypeDecl>& decl) -> Str {
    if (is<AliasTypeDecl>(decl)) {
@@ -1024,15 +1069,13 @@ fn render(const Node<TypeDecl>& decl) -> Str {
    } else if (is<RecordTypeDecl>(decl)) {
       return render(deref<RecordTypeDecl>(decl));
    } else {
-      fatal("unreachable");
+      fatal("unreachable: render(TypeDecl)");
    }
 }
 
-fn render(const FunctionParamDecl& decl) -> Str {
-   return render(decl.name()) + ": " + render(decl.type());
-}
+fn render(const ParamDecl& decl) -> Str { return render(decl.name()) + ": " + render(decl.type()); }
 
-fn render(const FreeFunctionDecl& decl) -> Str {
+fn render(const FunctionDecl& decl) -> Str {
    auto result = "proc " + render(decl.name()) + "*(";
    auto first = true;
    for (const auto& formal : decl.formals()) {
@@ -1047,16 +1090,46 @@ fn render(const FreeFunctionDecl& decl) -> Str {
       result += ": ";
       result += render(*decl.return_type());
    }
-   result += "\n";
-   result += indent() + render_pragmas({import_cpp(decl.cpp_name())}) + "\n";
+   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
    return result;
 }
 
-fn render(const Node<FunctionDecl>& decl) -> Str {
-   if (is<FreeFunctionDecl>(decl)) {
-      return render(deref<FreeFunctionDecl>(decl));
+fn render(const ConstructorDecl& decl) -> Str {
+   Str result = "proc `{}`*(Self: type[";
+   result += render(decl.self()) + "]";
+   for (const auto& formal : decl.formals()) {
+      result += ", " + render(formal);
+   }
+   result += "): " + render(decl.self());
+   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
+   return result;
+}
+
+fn render(const MethodDecl& decl) -> Str {
+
+   Str result = "proc " + render(decl.name()) + "*(self: ";
+   result += render(decl.self());
+   for (const auto& formal : decl.formals()) {
+      result += ", " + render(formal);
+   }
+   result += ")";
+   if (decl.return_type()) {
+      result += ": ";
+      result += render(*decl.return_type());
+   }
+   result += "\n" + indent() + render_pragmas({import_cpp(decl.cpp_name() + "(@)")}) + "\n";
+   return result;
+}
+
+fn render(const Node<RoutineDecl>& decl) -> Str {
+   if (is<FunctionDecl>(decl)) {
+      return render(deref<FunctionDecl>(decl));
+   } else if (is<ConstructorDecl>(decl)) {
+      return render(deref<ConstructorDecl>(decl));
+   } else if (is<MethodDecl>(decl)) {
+      return render(deref<MethodDecl>(decl));
    } else {
-      fatal("unreachable");
+      fatal("unreachable: render(FunctionDecl)");
    }
 }
 
@@ -1067,38 +1140,15 @@ fn render(const Node<VariableDecl>& decl) -> Str {
 
 } // namespace rendering
 
-fn finalize(const Context& ctx) {
-   Str output;
-   output += "# generated bindings --- machine dependent\n";
-   if (ctx.type_decls().size() != 0) {
-      output += "# type section\n";
-      output += "type\n";
-      for (const auto& type_decl : ctx.type_decls()) {
-         output += rendering::indent(rendering::render(type_decl));
-      }
-   }
-   if (ctx.function_decls().size() != 0) {
-      output += "# function section\n";
-      for (const auto& function_decl : ctx.function_decls()) {
-         output += rendering::render(function_decl);
-      }
-   }
-   if (ctx.variable_decls().size() != 0) {
-      output += "# variable section\n";
-      output += "var\n";
-      for (const auto& variable_decl : ctx.variable_decls()) {
-         output += rendering::indent(rendering::render(variable_decl));
-      }
-   }
-   os::write_file(ctx.cfg.name() + ".nim", output);
-}
-
+// Instantiate this class to do the work. The Config will grow in complexity to support
+// introspection to produce wrappers that make c++ devs jealous.
 class BindAction : public clang::RecursiveASTVisitor<BindAction> {
    priv const Config& cfg;
    priv const std::unique_ptr<clang::ASTUnit> tu;
    priv Context ctx;
 
-   // Load a translation unit from user provided arguments with additional include path arguments.
+   // Load a translation unit from user provided arguments with additional include path
+   // arguments.
    priv fn parse_tu() -> std::unique_ptr<clang::ASTUnit> {
       Vec<Str> args = {"-xc++"};
       auto includes = include_paths();
@@ -1108,15 +1158,49 @@ class BindAction : public clang::RecursiveASTVisitor<BindAction> {
                                                       "ensnare");
    }
 
+   // Render and write out our decls.
+   priv fn finalize() {
+      Str output;
+      output += "# generated bindings --- machine dependent\n";
+      if (ctx.type_decls().size() != 0) {
+         output += "# type section\n";
+         output += "type\n";
+         for (const auto& type_decl : ctx.type_decls()) {
+            output += rendering::indent(rendering::render(type_decl));
+         }
+      }
+      if (ctx.routine_decls().size() != 0) {
+         output += "# function section\n";
+         for (const auto& routine_decl : ctx.routine_decls()) {
+            output += rendering::render(routine_decl);
+         }
+      }
+      if (ctx.variable_decls().size() != 0) {
+         output += "# variable section\n";
+         output += "var\n";
+         for (const auto& variable_decl : ctx.variable_decls()) {
+            output += rendering::indent(rendering::render(variable_decl));
+         }
+      }
+      os::write_file(ctx.cfg.output() + ".nim", output);
+   }
+
    pub BindAction(const Config& cfg) : cfg(cfg), tu(parse_tu()), ctx(cfg, tu->getASTContext()) {
-      auto result = this->TraverseAST(tu->getASTContext());
-      if (!result) {
-         fatal("ensnare ");
+      // Collect all our declarations.
+      auto result = TraverseAST(tu->getASTContext());
+      if (!result) { // Idk wtf this thing means? It is true even with errors...
+         fatal("BindAction failed");
+      } else {
+         finalize();
       }
    }
 
    pub fn VisitDecl(clang::Decl* decl) -> bool {
-      wrap(this->ctx, decl);
+      if (decl) {
+         wrap(ctx, *decl);
+      } else {
+         fatal("unreachable: got a null visitor decl");
+      }
       return true;
    }
 };
