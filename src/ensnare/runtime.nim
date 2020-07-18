@@ -65,75 +65,77 @@ const cstddef_h = "<cstddef>"
 
 type
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#1
-   cpp_schar* {.import_cpp: "signed char".} = int8
-   cpp_short* {.import_cpp: "short int".} = int16
-   cpp_int* {.import_cpp: "int".} = int32
-   cpp_long* {.import_cpp: "long int".} = int64
-   cpp_long_long* {.import_cpp: "long long int".} = int64
+   CppSChar* {.import_cpp: "signed char".} = int8
+   CppShort* {.import_cpp: "short int".} = int16
+   CppInt* {.import_cpp: "int".} = int32
+   CppLong* {.import_cpp: "long int".} = int64
+   CppLongLong* {.import_cpp: "long long int".} = int64
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#2
-   cpp_uchar* {.import_cpp: "unsigned char".} = uint8
-   cpp_ushort* {.import_cpp: "unsigned short int".} = uint16
-   cpp_uint* {.import_cpp: "unsigned int".} = uint32
-   cpp_ulong* {.import_cpp: "unsigned long int".} = uint64
-   cpp_ulong_long* {.import_cpp: "unsigned long long int".} = uint64
+   CppUChar* {.import_cpp: "unsigned char".} = uint8
+   CppUShort* {.import_cpp: "unsigned short int".} = uint16
+   CppUInt* {.import_cpp: "unsigned int".} = uint32
+   CppULong* {.import_cpp: "unsigned long int".} = uint64
+   CppULongLong* {.import_cpp: "unsigned long long int".} = uint64
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#7
-   cpp_char* = char
+   CppChar* = char
 
 # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#8
 when defined(windows): # FIXME: when is this signed and unsigned
                        #        source for windows vs other sizing.
-   type cpp_wchar_t* {.import_cpp: "wchar_t".} = uint16
+   type CppWChar* {.import_cpp: "wchar_t".} = uint16
 else:
-   type cpp_wchar_t* {.import_cpp: "wchar_t".} = uint32
+   type CppWChar* {.import_cpp: "wchar_t".} = uint32
 
 type
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#9
-   cpp_char8_t* {.import_cpp: "char8_t".} = char
-   cpp_char16_t* {.import_cpp: "char8_t".} = uint16
-   cpp_char32_t* {.import_cpp: "char8_t".} = uint32
+   CppChar8* {.import_cpp: "char8_t".} = char
+   CppChar16* {.import_cpp: "char8_t".} = uint16
+   CppChar32* {.import_cpp: "char8_t".} = uint32
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#10
-   cpp_bool* = bool
+   CppBool* = bool
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#12
-   cpp_float* {.import_cpp: "float".} = float32
-   cpp_double* {.import_cpp: "double".} = float64
-   cpp_long_double* {.import_cpp: "long double".} = float64
+   CppFloat* {.import_cpp: "float".} = float32
+   CppDouble* {.import_cpp: "double".} = float64
+   CppLongDouble* {.import_cpp: "long double".} = float64
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#13
-   cpp_void* {.import_cpp: "decltype(void)".} = ptr object
+   CppVoid* {.import_cpp: "decltype(void)".} = ptr object
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#14, `std::nullptr_t` comes with cstddef.
 
 type # exntensions
-   cpp_int128* {.import_cpp: "__int128_t".} = int64
-   cpp_uint128* {.import_cpp: "__uint128_t".} = uint64
-   cpp_neon_float16* {.import_cpp: "__fp16".} = uint16
-   cpp_ocl_float16* {.import_cpp: "half".} = uint16
-   cpp_float16* {.import_cpp: "_Float16".} = uint16
-   cpp_float128* {.import_cpp: "__float128".} = float64
+   CppInt128* {.import_cpp: "__int128_t".} = int64
+   CppUInt128* {.import_cpp: "__uint128_t".} = uint64
+   CppNeonFloat16* {.import_cpp: "__fp16".} = uint16
+   CppOCLFloat16* {.import_cpp: "half".} = uint16
+   CppFloat16* {.import_cpp: "_Float16".} = uint16
+   CppFloat128* {.import_cpp: "__float128".} = float64
 
 type
-   cpp_const*[T] {.import_cpp: "ensnare::runtime::constant<'0>", header: hpp.} = object
-   cpp_unsized_array*[T] {.import_cpp: "ensnare::runtime::unsized_array<'0>", header: hpp.} = object
-   cpp_char_ptr* = ptr cpp_const[char]
-   cpp_mutable_char_ptr* = ptr char
+   CppConst*[T] {.import_cpp: "ensnare::runtime::Constant<'0>", header: hpp.} = object
+   CppUnsizedArray*[T] {.import_cpp: "ensnare::runtime::UnsizedArray<'0>", header: hpp.} = object
+   CppCharPtr* = ptr CppConst[char]
 
-proc `=`*[T](dst: var cpp_unsized_array[T], src: cpp_unsized_array[T]) {.error.}
-proc `=sink`*[T](dst: var cpp_unsized_array[T], src: cpp_unsized_array[T]) {.error.}
+proc `=`*[T](dst: var CppUnsizedArray[T], src: CppUnsizedArray[T]) {.error.}
+proc `=sink`*[T](dst: var CppUnsizedArray[T], src: CppUnsizedArray[T]) {.error.}
 
 type # <cstddef> types
-   cpp_size_t* {.import_cpp: "std::size_t", header: cstddef_h.} = uint
-   cpp_ptrdiff_t* {.import_cpp: "std::ptrdiff_t", header: cstddef_h.} = int
+   CppSize* {.import_cpp: "std::size_t", header: cstddef_h.} = uint
+   CppPtrDiff* {.import_cpp: "std::ptrdiff_t", header: cstddef_h.} = int
    # this one is weird. We can maybe determine manually ourselves.
    # cpp_max_align_t* {.import_cpp: "std::max_align_t", header: cstddef_h.} =
-   cpp_byte* {.import_cpp: "std::byte", header: cstddef_h.} = object
-   cpp_nullptr_t* {.import_cpp: "std::nullptr_t", header: cstddef_h.} = type_of(nil)
+   CppByte* {.import_cpp: "std::byte", header: cstddef_h.} = object
+   CppNullPtr* {.import_cpp: "std::nullptr_t", header: cstddef_h.} = type_of(nil)
 
-proc cpp_static_assert*(condition: bool, message: c_string) {.import_cpp: "static_assert(@)".}
+proc cpp_static_assert*(condition: bool, message: CppCharPtr) {.import_cpp: "static_assert(@)".}
 
-proc cpp_size_of*[T](_: T): cpp_size_t {.import_cpp: "sizeof(@)".}
-proc cpp_size_of*[T](_: type[T]): cpp_size_t {.import_cpp: "sizeof('0)".}
+proc cpp_size_of*[T](_: T): CppSize {.import_cpp: "sizeof(@)".}
+proc cpp_size_of*[T](_: type[T]): CppSize {.import_cpp: "sizeof('0)".}
 
-var cpp_standard {.no_decl, import_cpp: "__cplusplus".}: cpp_long
+var cpp_standard {.no_decl, import_cpp: "__cplusplus".}: CppLong
 
-cpp_static_assert(cpp_standard >= 201703.cpp_long, "c++17 or later is required")
+template c_str(str: untyped{nkStrLit}): CppCharPtr =
+   cast[CppCharPtr](str.c_string)
+
+cpp_static_assert(cpp_standard >= 201703.CppLong, "c++17 or later is required".c_str)
 #cpp_static_assert(cpp_size_of(cpp_int) == 4, "Only LP64 systems are supported")
 #cpp_static_assert(cpp_size_of(cpp_long) == 8, "Only LP64 systems are supported")
 
@@ -191,6 +193,9 @@ macro cpp_link_lib*(libraries: static[openarray[string]]) =
    result = nnkStmtList{}
    for library in libraries:
       result.add(!`bind cpp_link_lib`(`library.lit`))
+
+template cpp_compile_src*(src: static[string]) =
+   {.compile: src.}
 
 template emit_cpp*(src: static[string]) =
    {.emit: src.}

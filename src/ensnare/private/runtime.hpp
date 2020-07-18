@@ -1,13 +1,14 @@
 #pragma once
 
-#include "ensnare/private/syn.hpp"
-
 #include <memory>
 #include <type_traits>
 
+//
+#include "ensnare/private/syn.hpp"
+
 namespace ensnare::runtime {
-template <typename T> using unsized_array = T[];
-template <typename T> using constant = std::add_const_t<T>;
+template <typename T> using UnsizedArray = T[];
+template <typename T> using Constant = std::add_const_t<T>;
 
 template <typename T> class LaunderClassBuf {
    priv bool live; // We need this flag to not destroy an unitialized object or

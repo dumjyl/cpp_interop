@@ -11,3 +11,5 @@ class Foo {
 };
 blah::Foo x(1, 2);
 } // namespace blah
+
+enum class SomeEnum { a, b, c };

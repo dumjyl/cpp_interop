@@ -7,37 +7,10 @@
 #include <variant>
 #include <vector>
 
-// preserve order
+//
 #include "ensnare/private/syn.hpp"
 
 namespace ensnare {
-template <typename T> using Vec = std::vector<T>;
-
-template <typename T> using Opt = std::optional<T>;
-
-template <typename K, typename V> using Map = std::unordered_map<K, V>;
-
-using Str = std::string;
-
-template <typename T> using Node = std::shared_ptr<T>;
-
-template <typename... Variants> using Union = const std::variant<Variants...>;
-
-// Check if a `Union` is a thing. If it is you can `deref<T>(self)` it.
-template <typename T, typename... Variants> fn is(const Node<Union<Variants...>>& self) -> bool {
-   return std::holds_alternative<T, Variants...>(*self);
-}
-
-template <typename T, typename... Variants>
-fn deref(const Node<Union<Variants...>>& self) -> const T& {
-   return std::get<T, Variants...>(*self);
-}
-
-// Create a value ref counted node of type `Y` constructed from `X`.
-template <typename Y, typename... Args> fn node(Args... args) -> Node<Y> {
-   return std::make_shared<Y>(args...);
-}
-
 // Template recursion base case.
 template <typename... Args> fn write(std::ostream* out, Args... args) {}
 
@@ -60,6 +33,41 @@ template <typename... Args> fn print(Args... args) { print(&std::cout, args...);
 template <typename... Args> fn fatal [[noreturn]] (Args... args) {
    print("fatal-error: ", args...);
    std::exit(1);
+}
+
+template <typename T> using Vec = std::vector<T>;
+
+template <typename K, typename V> using Map = std::unordered_map<K, V>;
+
+using Str = std::string;
+
+template <typename T> using Node = std::shared_ptr<T>;
+
+// Create a value ref counted node of type `Y` constructed from `X`.
+template <typename Y, typename... Args> fn node(Args... args) -> Node<Y> {
+   return std::make_shared<Y>(args...);
+}
+
+template <typename... Variants> using Union = const std::variant<Variants...>;
+
+// Check if a `Union` is a thing. If it is you can `deref<T>(self)` it.
+template <typename T, typename... Variants> fn is(const Node<Union<Variants...>>& self) -> bool {
+   return std::holds_alternative<T, Variants...>(*self);
+}
+
+template <typename T, typename... Variants>
+fn deref(const Node<Union<Variants...>>& self) -> const T& {
+   return std::get<T, Variants...>(*self);
+}
+
+template <typename T> using Opt = std::optional<T>;
+
+template <typename T> fn expect(Opt<T> result, const Str& msg) -> T {
+   if (result) {
+      return *result;
+   } else {
+      fatal("failed to unpack a none variant; " + msg);
+   }
 }
 }; // namespace ensnare
 #include "ensnare/private/undef_syn.hpp"

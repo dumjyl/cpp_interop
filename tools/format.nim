@@ -20,9 +20,10 @@ proc process(str: string): string =
          result.add(line & "\n")
 
 proc main =
-   for file in get_files(param_str(1)):
-      let (output, code) = exec("clang-format", [file])
-      assert(code == 0, "failed for: " & file)
-      write_file(file, output.process[0 .. ^2])
+   for dir in ["tests", "src"]:
+      for file in get_files(dir):
+         let (output, code) = exec("clang-format", [file])
+         assert(code == 0, "failed for: " & file)
+         write_file(file, output.process[0 .. ^2])
 
 when is_main_module: main()

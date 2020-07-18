@@ -1,18 +1,22 @@
 import ensnare/runtime
 
-# type section
+# --- types
 
 type
-   `blah-Foo`* {.import_cpp: "blah::Foo".} = object
+   `blah-Foo`* {.import_cpp: "blah::Foo", header: "abc.hpp".} = object
+   SomeEnum* {.import_cpp: "SomeEnum", header: "abc.hpp".} = enum
+      a = 0
+      b = 1
+      c = 2
 
-# routine section
+# --- routines
 
-proc `{}`*(Self: type[`blah-Foo`], a: cpp_int, b: cpp_int): `blah-Foo`
+proc `{}`*(Self: type[`blah-Foo`], a: CppInt, b: CppInt): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
-proc calc*(self: `blah-Foo`, a: cpp_int, b: cpp_int): `blah-Foo`
+proc calc*(self: `blah-Foo`, x: CppInt): CppInt
    {.import_cpp: "blah::Foo::calc(@)", header: "abc.hpp".}
 
-# variable section
+# --- variables
 
 var
-   `blah-x`* {.import_cpp: "blah::x".}: `blah-Foo`
+   `blah-x`* {.import_cpp: "blah::x", header: "abc.hpp".}: `blah-Foo`

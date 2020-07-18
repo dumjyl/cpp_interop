@@ -81,7 +81,7 @@ IncludeCategories:
   - Regex: '^<.*>'
     Priority: 7
 IncludeIsMainRegex: '$'
-IndentCaseLabels: false
+IndentCaseLabels: true
 IndentPPDirectives: None
 IndentWidth:     3
 IndentWrappedFunctionNames: false

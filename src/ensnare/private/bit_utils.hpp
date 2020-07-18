@@ -1,3 +1,5 @@
+// Provides a generic bit set
+
 #pragma once
 
 #include "ensnare/private/utils.hpp"
