@@ -72,30 +72,10 @@ fn ensnare::os::successful_process_output(const Str& cmd, std::size_t buf_size) 
    }
 }
 
-fn ensnare::os::is_system_header(const Str& header) -> bool {
-   return (header.size() > 2 && header[0] == '<' and header[header.size() - 1] == '>');
-}
-
-fn ensnare::os::extract_system_header(const Str& header) -> Str {
-   return header.substr(1, header.size() - 2);
-}
-
-fn ensnare::os::is_cpp_file(const Str& header) -> bool {
-   if (is_system_header(header)) {
-      return true;
-   } else {
-      fs::path path(header);
-      for (const auto& ext : {".hpp", ".cpp", ".h", ".c"}) {
-         if (path.extension() == ext) {
-            return true;
-         }
-      }
-      return false;
-   }
-}
-
 fn ensnare::os::set_file_ext(const Str& file, const Str& ext) -> Str {
    return fs::path(file).replace_extension(ext);
 }
+
+fn ensnare::os::get_file_ext(const Str& file) -> Str { return fs::path(file).extension(); }
 
 #include "ensnare/private/undef_syn.hpp"

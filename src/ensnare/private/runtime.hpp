@@ -10,6 +10,7 @@ namespace ensnare::runtime {
 template <typename T> using UnsizedArray = T[];
 template <typename T> using Constant = std::add_const_t<T>;
 
+/// Do not use. An unsafe POD buffer managed by nim destructors.
 template <typename T> class LaunderClassBuf {
    priv bool live; // We need this flag to not destroy an unitialized object or
                    // an already destroyed object.// Both of which are

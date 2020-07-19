@@ -13,9 +13,9 @@ cl::opt<bool> disable_includes("disable-includes",
 cl::opt<Str> output(cl::Positional, cl::desc("output wrapper name/path"));
 cl::list<Str> args(cl::ConsumeAfter, cl::desc("clang args..."));
 
-fn ensnare::Config::headers() const -> const Vec<Str>& { return _headers; }
+fn ensnare::Config::headers() const -> const Vec<Header>& { return _headers; }
 fn ensnare::Config::output() const -> const Str& { return _output; }
-fn ensnare::Config::clang_args() const -> const Vec<Str>& { return _clang_args; }
+fn ensnare::Config::user_clang_args() const -> const Vec<Str>& { return _user_clang_args; }
 fn ensnare::Config::syms() const -> const Vec<Str>& { return _syms; }
 fn ensnare::Config::disable_includes() const -> bool { return _disable_includes; }
 
@@ -25,10 +25,11 @@ ensnare::Config::Config(int argc, const char* argv[]) {
    _disable_includes = ::disable_includes;
    _output = ::output;
    for (const auto& arg : args) {
-      if (os::is_cpp_file(arg)) {
-         _headers.push_back(arg);
+      auto header = Header::parse(arg);
+      if (header) {
+         _headers.push_back(*header);
       } else {
-         _clang_args.push_back(arg);
+         _user_clang_args.push_back(arg);
       }
    }
 };
@@ -39,13 +40,7 @@ fn ensnare::Config::header_file() const -> Str {
    } else {
       Str result;
       for (const auto& header : _headers) {
-         result += "#include ";
-         if (os::is_system_header(header)) {
-            result += header;
-         } else {
-            result += "\"" + header + "\"";
-         }
-         result += '\n';
+         result += header.render();
       }
       return result;
    };

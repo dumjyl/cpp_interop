@@ -1,5 +1,3 @@
-// Provides a generic bit set
-
 #pragma once
 
 #include "ensnare/private/utils.hpp"
@@ -45,9 +43,11 @@ constexpr fn type_size() -> std::size_t {
 template <typename T> using IsBitEncodable = std::enable_if_t<(type_size<T>() < 1024)>;
 } // namespace detail
 
+/// A simple bit set class.
 template <typename T, typename = detail::IsBitEncodable<T>> class BitSet {
    priv char detail[detail::type_size<T>() / 8];
 
+   /// Include a value in the bitset.
    pub fn incl(T val) {
       auto i = detail::encode(val);
       detail[i / 8] = detail[i / 8] | (1 << (i % 8));
@@ -55,8 +55,10 @@ template <typename T, typename = detail::IsBitEncodable<T>> class BitSet {
 
    fn get(std::size_t i) const -> bool { return (detail[i / 8] & (1 << (i % 8))) != 0; }
 
+   /// Check if val is occupied.
    pub fn operator[](T val) const -> bool { return get(detail::encode(val)); }
 
+   /// Stringify the bitset for debugging.
    pub fn to_str() -> Str {
       Str result = "[";
       for (auto i = 0; i < detail::type_size<T>(); i += 1) {
@@ -70,6 +72,7 @@ template <typename T, typename = detail::IsBitEncodable<T>> class BitSet {
    }
 };
 
+/// A bit set specialized for encoding `char`.
 using CharSet = BitSet<char>;
 } // namespace ensnare
 

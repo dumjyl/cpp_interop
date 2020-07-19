@@ -1,3 +1,24 @@
+///
+/// \mainpage
+/// This page describes the internal documentation of ensnare. Not its usage.
+///
+
+/// \namespace ensnare
+/// Main project namespace.
+
+/// \file
+///
+/// The core binding code consists of two kinds of operation, wrapping and mapping.
+/// Wrapping produces Node<Type>s
+///
+
+// We have the `wrap` operation which add declarative bindings to the
+//`Context` from the `Stmt`s
+// we / visit. / We have the `map` operation which produces a suitable ir type
+// from a `Type`,
+//`QualType` or / even some kinds of `Stmt` (a decltype for example).
+//
+
 // FIXME: typedef handling with
 
 #pragma once
@@ -15,52 +36,78 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Tooling/Tooling.h"
 
-// preserve order
+//
 #include "ensnare/private/syn.hpp"
 
 namespace ensnare {
 
-// The cananonical types defined in runtime.nim
-class Builtins {
-   priv static fn init(const char* name) -> Node<Type> { return node<Type>(AtomType(name)); }
+///
+/// Contains constants to the low level atomic (in the AST sense) types for building more
+/// complicated types.
+///
+namespace builtins {
+/// Initalize a builtin type.
+fn init(const char* name) -> Node<Type> { return node<Type>(AtomType(name)); }
 
-   pub const Node<Type> _schar = Builtins::init("CppSChar");
-   pub const Node<Type> _short = Builtins::init("CppShort");
-   pub const Node<Type> _int = Builtins::init("CppInt");
-   pub const Node<Type> _long = Builtins::init("CppLong");
-   pub const Node<Type> _long_long = Builtins::init("CppLongLong");
-   pub const Node<Type> _uchar = Builtins::init("CppUChar");
-   pub const Node<Type> _ushort = Builtins::init("CppUShort");
-   pub const Node<Type> _uint = Builtins::init("CppUInt");
-   pub const Node<Type> _ulong = Builtins::init("CppULong");
-   pub const Node<Type> _ulong_long = Builtins::init("CppULongLong");
-   pub const Node<Type> _char = Builtins::init("CppChar");
-   pub const Node<Type> _wchar = Builtins::init("CppWChar");
-   pub const Node<Type> _char8 = Builtins::init("CppChar8");
-   pub const Node<Type> _char16 = Builtins::init("CppChar16");
-   pub const Node<Type> _char32 = Builtins::init("CppChar32");
-   pub const Node<Type> _bool = Builtins::init("CppBool");
-   pub const Node<Type> _float = Builtins::init("CppFloat");
-   pub const Node<Type> _double = Builtins::init("CppDouble");
-   pub const Node<Type> _long_double = Builtins::init("CppLongDouble");
-   pub const Node<Type> _void = Builtins::init("CppVoid");
-   pub const Node<Type> _int128 = Builtins::init("CppInt128");
-   pub const Node<Type> _uint128 = Builtins::init("CppUInt128");
-   pub const Node<Type> _neon_float16 = Builtins::init("CppNeonFloat16");
-   pub const Node<Type> _ocl_float16 = Builtins::init("CppOCLFloat16");
-   pub const Node<Type> _float16 = Builtins::init("CppFloat16");
-   pub const Node<Type> _float128 = Builtins::init("CppFloat128");
-   // we treat cstddef as builtins too.
-   pub const Node<Type> _size = Builtins::init("CppSize");
-   pub const Node<Type> _ptrdiff = Builtins::init("CppPtrDiff");
-   pub const Node<Type> _max_align = Builtins::init("CppMaxAlign");
-   pub const Node<Type> _byte = Builtins::init("CppByte");
-   pub const Node<Type> _nullptr = Builtins::init("CppNullPtr");
+/// An atomic Type.
+using Builtin = const Node<Type>;
 
-   pub Builtins() {}
-};
+/// An signed 1 byte integer type representing `signed char`.
+Builtin _schar = init("CppSChar");
+/// An signed 2 byte integer type representing `signed short`.
+Builtin _short = init("CppShort");
+/// An signed 4 byte integer type representing `signed int`.
+Builtin _int = init("CppInt");
+/// An signed 4-8 byte integer type representing `signed long`.
+Builtin _long = init("CppLong");
+/// An signed 8 byte integer type representing `signed long long`.
+Builtin _long_long = init("CppLongLong");
+/// An unsigned 1 byte integer type representing `unsigned char`.
+Builtin _uchar = init("CppUChar");
+/// An unsigned 2 byte integer type representing `unsigned short`.
+Builtin _ushort = init("CppUShort");
+/// An unsigned 4 byte integer type representing `unsigned int`.
+Builtin _uint = init("CppUInt");
+/// An unsigned 4-8 byte integer type representing `unsigned long`.
+Builtin _ulong = init("CppULong");
+/// An unsigned 8 byte integer type representing `unsigned long long`.
+Builtin _ulong_long = init("CppULongLong");
+/// An possibly signed 1 byte integer type representing `char`. Nim passes `funsigned-char` so this
+/// will always be unsigned for us.
+Builtin _char = init("CppChar");
 
-// A `Context` must not outlive a `Config`
+Builtin _wchar = init("CppWChar");
+/// An unsigned 1 byte integer representing `char8_t`.
+Builtin _char8 = init("CppChar8");
+/// An unsigned 2 byte integer representing `char16_t`.
+Builtin _char16 = init("CppChar16");
+/// An unsigned 4 byte integer representing `char32_t`.
+Builtin _char32 = init("CppChar32");
+Builtin _bool = init("CppBool");
+/// A 4 byte fp number representing `float`.
+Builtin _float = init("CppFloat");
+/// A 8 byte fp number representing `double`.
+Builtin _double = init("CppDouble");
+/// An at least 8 byte fp number representing `long double`.
+Builtin _long_double = init("CppLongDouble");
+Builtin _void = init("CppVoid");
+Builtin _int128 = init("CppInt128");
+Builtin _uint128 = init("CppUInt128");
+Builtin _neon_float16 = init("CppNeonFloat16");
+Builtin _ocl_float16 = init("CppOCLFloat16");
+Builtin _float16 = init("CppFloat16");
+Builtin _float128 = init("CppFloat128");
+// we treat cstddef as builtins too.
+Builtin _size = init("CppSize");
+Builtin _ptrdiff = init("CppPtrDiff");
+Builtin _max_align = init("CppMaxAlign");
+Builtin _byte = init("CppByte");
+Builtin _nullptr = init("CppNullPtr");
+} // namespace builtins
+
+/// Holds ensnare's state.
+///
+/// A `Context` must not outlive a `Config`
 class Context {
    pub const clang::ASTContext& ast_ctx;
    priv Map<const clang::Decl*, Node<Type>>
@@ -70,21 +117,22 @@ class Context {
    READ_ONLY(Vec<Node<VariableDecl>>, variable_decls); // Variables to output.
 
    pub const Config& cfg;
-   pub const Builtins builtins;
    priv std::size_t alt_counter;
    pub Context(const Config& cfg, const clang::ASTContext& ast_ctx)
       : cfg(cfg), ast_ctx(ast_ctx), alt_counter(0) {}
 
+   /// Are we in the alternative binding mode.
+   /// See alt_wrap for more information
+   pub fn alt() -> bool { return alt_counter != 0; }
    pub fn inc_alt() { alt_counter += 1; }
-
    pub fn dec_alt() { alt_counter -= 1; }
 
-   pub fn alt() -> bool { return alt_counter != 0; }
-
+   /// Get the filename from a source location.
    pub fn filename(const clang::SourceLocation& loc) const -> llvm::StringRef {
       return ast_ctx.getSourceManager().getFilename(loc);
    }
 
+   /// Lookup a Node<Type> of a declaration.
    pub fn lookup(const clang::Decl& decl) const -> Opt<Node<Type>> {
       auto decl_type = type_lookup.find(&decl);
       if (decl_type == type_lookup.end()) {
@@ -94,6 +142,7 @@ class Context {
       }
    }
 
+   /// FIXME: document what this does.
    pub fn set(const clang::Decl& decl, const Node<Type> type) {
       auto maybe_type = lookup(decl);
       if (maybe_type) {
@@ -103,20 +152,21 @@ class Context {
       }
    }
 
+   /// Add a type declaration to be rendered.
    pub fn add(const Node<TypeDecl> decl) { _type_decls.push_back(decl); }
 
+   /// Add a routine declaration to be rendered.
    pub fn add(const Node<RoutineDecl> decl) { _routine_decls.push_back(decl); }
 
+   /// Add a variable declaration to be rendered.
    pub fn add(const Node<VariableDecl> decl) { _variable_decls.push_back(decl); }
 
-   // Guards from wrapping private declarations.
-   pub fn access_filter(const clang::Decl& decl) const -> bool {
-      // AS_protected
-      // AS_private
-      // AS_none
+   /// Filters access to protected and private members..
+   pub fn access_guard(const clang::Decl& decl) const -> bool {
       return decl.getAccess() == clang::AS_public || decl.getAccess() == clang::AS_none;
    }
 
+   /// Find the user passed header (if any) that `decl` is declared within.
    pub fn header(const clang::NamedDecl& decl) const -> Opt<Str> {
       for (auto const& header : cfg.headers()) {
          if (ends_with(filename(decl.getLocation()), header)) {
@@ -127,18 +177,11 @@ class Context {
    }
 };
 
-// We have the `wrap` operation which add declarative bindings to the
-//`Context` from the `Stmt`s
-// we / visit. / We have the `map` operation which produces a suitable ir type
-// from a `Type`,
-//`QualType` or / even some kinds of `Stmt` (a decltype for example).
-//
-
 fn wrap(Context& ctx, const clang::NamedDecl& decl) -> void;
 
 fn map(Context& ctx, const clang::Type& decl) -> Node<Type>;
 
-template <typename T> fn map(Context& ctx, const T* entity) {
+template <typename T> fn map(Context& ctx, const T* entity) -> Node<Type> {
    if (entity) {
       return map(ctx, *entity);
    } else {
@@ -146,8 +189,7 @@ template <typename T> fn map(Context& ctx, const T* entity) {
    }
 }
 
-// Maps to an atomic type of some kind. Many of these are obscure and
-// unsupported.
+/// Maps to an atomic type of some kind. Many of these are obscure and unsupported.
 fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
    switch (entity.getKind()) {
       case clang::BuiltinType::Kind::OCLImage1dRO:
@@ -269,60 +311,60 @@ fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
                entity.getNameAsCString(clang::PrintingPolicy(clang::LangOptions())));
       }
       case clang::BuiltinType::Kind::SChar: // 'signed char', explicitly qualified
-         return ctx.builtins._schar;
+         return builtins::_schar;
       case clang::BuiltinType::Kind::Short:
-         return ctx.builtins._short;
+         return builtins::_short;
       case clang::BuiltinType::Kind::Int:
-         return ctx.builtins._int;
+         return builtins::_int;
       case clang::BuiltinType::Kind::Long:
-         return ctx.builtins._long;
+         return builtins::_long;
       case clang::BuiltinType::Kind::LongLong:
-         return ctx.builtins._long_long;
+         return builtins::_long_long;
       case clang::BuiltinType::Kind::UChar: // 'unsigned char', explicitly qualified
-         return ctx.builtins._char;
+         return builtins::_char;
       case clang::BuiltinType::Kind::UShort:
-         return ctx.builtins._ushort;
+         return builtins::_ushort;
       case clang::BuiltinType::Kind::UInt:
-         return ctx.builtins._uint;
+         return builtins::_uint;
       case clang::BuiltinType::Kind::ULong:
-         return ctx.builtins._ulong;
+         return builtins::_ulong;
       case clang::BuiltinType::Kind::ULongLong:
-         return ctx.builtins._ulong_long;
+         return builtins::_ulong_long;
       case clang::BuiltinType::Kind::Char_U: // 'char' for targets where it's unsigned
-         return ctx.builtins._char;
+         return builtins::_char;
       case clang::BuiltinType::Kind::WChar_U: // 'wchar_t' for targets where it's unsigned
       case clang::BuiltinType::Kind::WChar_S: // 'wchar_t' for targets where it's signed
                                               // FIXME: do we care about the difference?
-         return ctx.builtins._wchar;
+         return builtins::_wchar;
       case clang::BuiltinType::Kind::Char8: // 'char8_t' in C++20
-         return ctx.builtins._char8;
+         return builtins::_char8;
       case clang::BuiltinType::Kind::Char16: // 'char16_t' in C++
-         return ctx.builtins._char16;
+         return builtins::_char16;
       case clang::BuiltinType::Kind::Char32: // 'char32_t' in C++
-         return ctx.builtins._char32;
+         return builtins::_char32;
       case clang::BuiltinType::Kind::Bool: // 'bool' in C++, '_Bool' in C99
-         return ctx.builtins._bool;
+         return builtins::_bool;
       case clang::BuiltinType::Kind::Float:
-         return ctx.builtins._float;
+         return builtins::_float;
       case clang::BuiltinType::Kind::Double:
-         return ctx.builtins._double;
+         return builtins::_double;
       case clang::BuiltinType::Kind::LongDouble:
-         return ctx.builtins._long_double;
+         return builtins::_long_double;
       case clang::BuiltinType::Kind::Void: // 'void'
-         return ctx.builtins._void;
+         return builtins::_void;
       case clang::BuiltinType::Kind::Int128: // '__int128_t'
-         return ctx.builtins._int128;
+         return builtins::_int128;
       case clang::BuiltinType::Kind::UInt128: // '__uint128_t'
-         return ctx.builtins._uint128;
+         return builtins::_uint128;
       case clang::BuiltinType::Kind::Half: // 'half' in OpenCL, '__fp16' in ARM NEON.
          // FIXME: return ctx.builtins._ocl_float16;
-         return ctx.builtins._neon_float16;
+         return builtins::_neon_float16;
       case clang::BuiltinType::Kind::Float16: // '_Float16'
-         return ctx.builtins._float16;
+         return builtins::_float16;
       case clang::BuiltinType::Kind::Float128: // '__float128'
-         return ctx.builtins._float128;
+         return builtins::_float128;
       case clang::BuiltinType::Kind::NullPtr: // type of 'nullptr'
-         return ctx.builtins._nullptr;
+         return builtins::_nullptr;
       default:
          entity.dump();
          fatal("unreachable: builtin type: ",
@@ -330,6 +372,7 @@ fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
    }
 } // namespace ensnare::ct
 
+/// Map a const/volatile/__restrict qualified type.
 fn map(Context& ctx, const clang::QualType& entity) -> Node<Type> {
    // Too niche to care about for now.
    if (entity.isRestrictQualified() || entity.isVolatileQualified()) {
@@ -349,6 +392,8 @@ fn map(Context& ctx, const clang::QualType& entity) -> Node<Type> {
    }
 }
 
+/// Map a Node<TypeDecl>. These get stored on the right hand side of Context::type_lookup.
+/// See Context::set for more information.
 fn map(Context& ctx, const Node<TypeDecl>& entity) -> Node<Type> {
    if (is<AliasTypeDecl>(entity)) {
       return node<Type>(AtomType(deref<AliasTypeDecl>(entity).name));
@@ -361,10 +406,13 @@ fn map(Context& ctx, const Node<TypeDecl>& entity) -> Node<Type> {
    }
 }
 
+/// Map an elaborated type. An elaborated type some is some sugar to not lose information in the
+/// clang AST. We care about semantics so it should not matter.
 fn map(Context& ctx, const clang::ElaboratedType& entity) -> Node<Type> {
    return map(ctx, entity.getNamedType());
 }
 
+/// Wrap a declaration in alternative mode.
 fn alt_wrap(Context& ctx, const clang::NamedDecl& decl) {
    ctx.inc_alt();
    wrap(ctx, decl);
@@ -469,31 +517,7 @@ fn map(Context& ctx, const clang::Type& entity) -> Node<Type> {
 
 #undef DISPATCH
 
-// return a suitable name from a named declaration.
-fn nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
-   auto name = decl.getDeclName();
-   switch (name.getNameKind()) {
-      case clang::DeclarationName::NameKind::Identifier: {
-         return decl.getNameAsString();
-      }
-      case clang::DeclarationName::NameKind::ObjCZeroArgSelector:
-      case clang::DeclarationName::NameKind::ObjCOneArgSelector:
-      case clang::DeclarationName::NameKind::ObjCMultiArgSelector: {
-         fatal("obj-c not supported");
-      }
-      case clang::DeclarationName::NameKind::CXXConstructorName:
-      case clang::DeclarationName::NameKind::CXXDestructorName:
-      case clang::DeclarationName::NameKind::CXXConversionFunctionName:
-      case clang::DeclarationName::NameKind::CXXOperatorName:
-      case clang::DeclarationName::NameKind::CXXDeductionGuideName:
-      case clang::DeclarationName::NameKind::CXXLiteralOperatorName:
-      case clang::DeclarationName::NameKind::CXXUsingDirective:
-      default:
-         decl.dump();
-         fatal("unhandled decl name");
-   }
-}
-
+/// Collect the relevant named declaration contexts for a declaration.
 fn decl_contexts(const clang::NamedDecl& decl) -> llvm::SmallVector<const clang::DeclContext*, 8> {
    llvm::SmallVector<const clang::DeclContext*, 8> result;
    const clang::DeclContext* ctx = decl.getDeclContext();
@@ -506,30 +530,12 @@ fn decl_contexts(const clang::NamedDecl& decl) -> llvm::SmallVector<const clang:
    return result;
 }
 
+/// Is this tag declaration declared without an identifier.
 fn has_name(const clang::TagDecl& decl) -> bool { return decl.getIdentifier(); }
 
+/// A qualified name contains all opaque namespace and type contexts.
+/// Instead of the c++ double colon we use a minus and stropping.
 fn qualified_nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
-   // auto name = decl.getDeclName();
-   // switch (name.getNameKind()) {
-   // case clang::DeclarationName::NameKind::Identifier: {
-   //   return decl.getNameAsString();
-   //}
-   // case clang::DeclarationName::NameKind::ObjCZeroArgSelector:
-   // case clang::DeclarationName::NameKind::ObjCOneArgSelector:
-   // case clang::DeclarationName::NameKind::ObjCMultiArgSelector: {
-   //   fatal("obj-c not supported");
-   //}
-   // case clang::DeclarationName::NameKind::CXXConstructorName:
-   // case clang::DeclarationName::NameKind::CXXDestructorName:
-   // case clang::DeclarationName::NameKind::CXXConversionFunctionName:
-   // case clang::DeclarationName::NameKind::CXXOperatorName:
-   // case clang::DeclarationName::NameKind::CXXDeductionGuideName:
-   // case clang::DeclarationName::NameKind::CXXLiteralOperatorName:
-   // case clang::DeclarationName::NameKind::CXXUsingDirective:
-   // default:
-   //   decl.dump();
-   //   fatal("unhandled decl name");
-   //}
    return replace(decl.getQualifiedNameAsString(), "::", "-");
 }
 
@@ -570,14 +576,15 @@ fn wrap(Context& ctx, const clang::CXXRecordDecl& decl) {
    }
 }
 
+// Check if `decl` is an item from
 fn get_cstddef_item(Context& ctx, const clang::NamedDecl& decl) -> Opt<Node<Type>> {
    auto qualified_name = decl.getQualifiedNameAsString();
    if (qualified_name == "std::size_t" || qualified_name == "size_t") {
-      return ctx.builtins._size;
+      return builtins::_size;
    } else if (qualified_name == "std::ptrdiff_t" || qualified_name == "ptrdiff_t") {
-      return ctx.builtins._ptrdiff;
+      return builtins::_ptrdiff;
    } else if (qualified_name == "std::nullptr_t") {
-      return ctx.builtins._nullptr;
+      return builtins::_nullptr;
    } else {
       return {};
    }
@@ -591,15 +598,25 @@ fn wrap_alias(Context& ctx, const clang::TypedefNameDecl& decl) {
    ctx.add(type_decl);
 }
 
-// This means it names an unnamed type
+/// Does this typedef represent an anonymous tag type.
 fn defines_type(const clang::TypedefNameDecl& decl) -> bool {
    const auto tag = llvm::dyn_cast<clang::TagType>(decl.getUnderlyingType());
    return tag && !has_name(*tag->getDecl());
 }
 
+fn wrap_typedef(Context& ctx, const clang::TypedefNameDecl& typedef_decl,
+                const clang::CXXRecordDecl& decl) {}
+
+fn wrap_typedef(Context& ctx, const clang::TypedefNameDecl& typedef_decl,
+                const clang::RecordDecl& decl) {}
+
+fn wrap_typedef(Context& ctx, const clang::TypedefNameDecl& typedef_decl,
+                const clang::EnumDecl& decl) {}
+
+/// Wrap a type aliasing declaration.
+/// We produce something like `type AliasName* = UnderlyingType`.
+/// Typedefs for anonymous and tag types with identical names have special handling.
 fn wrap(Context& ctx, const clang::TypedefNameDecl& decl) {
-   // This could be c++ `TypeAliasDecl` or a `TypedefDecl`.
-   // Either way, we produce `type AliasName* = UnderlyingType`
 
    // We map certain typedefs from the stdlib to builtins.
    auto cstddef_item = get_cstddef_item(ctx, decl);
@@ -607,11 +624,14 @@ fn wrap(Context& ctx, const clang::TypedefNameDecl& decl) {
       ctx.set(decl, *cstddef_item);
    } else if (defines_type(decl)) {
       // The inner type is an unnamed tag type. It has not been wrapped yet.
-      // FIXME
-      if (const auto record_decl = llvm::dyn_cast<clang::CXXRecordDecl>(tag_decl)) {
-
+      if (const auto cxx_record_decl = llvm::dyn_cast<clang::CXXRecordDecl>(&decl)) {
+         wrap_typedef(ctx, decl, *cxx_record_decl);
+      } else if (const auto record_decl = llvm::dyn_cast<clang::RecordDecl>(&decl)) {
+         wrap_typedef(ctx, decl, *record_decl);
+      } else if (const auto enum_decl = llvm::dyn_cast<clang::EnumDecl>(&decl)) {
+         wrap_typedef(ctx, decl, *enum_decl);
       } else {
-         fatal("unreachable: anon tag typedef");
+         fatal("unhandled: anon tag typedef");
       }
    } else {
       wrap_alias(ctx, decl);
@@ -653,7 +673,7 @@ fn is_visible(const clang::VarDecl& decl) -> bool {
 }
 
 fn wrap(Context& ctx, const clang::VarDecl& decl) {
-   if (ctx.access_filter(decl) && is_visible(decl)) {
+   if (ctx.access_guard(decl) && is_visible(decl)) {
       ctx.add(node<VariableDecl>(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
                                  expect(ctx.header(decl), "failed to canonicalize source location"),
                                  map(ctx, decl.getType())));
@@ -675,7 +695,7 @@ fn wrap(Context& ctx, const clang::FunctionDecl& decl) {
 }
 
 fn wrap_non_template(Context& ctx, const clang::CXXConstructorDecl& decl) {
-   if (ctx.access_filter(decl)) {
+   if (ctx.access_guard(decl)) {
       ctx.add(node<RoutineDecl>(
           ConstructorDecl(decl.getQualifiedNameAsString(),
                           expect(ctx.header(decl), "failed to canonicalize source location"),
@@ -698,7 +718,7 @@ fn wrap(Context& ctx, const clang::CXXConstructorDecl& decl) {
 }
 
 fn wrap_non_template(Context& ctx, const clang::CXXMethodDecl& decl) {
-   if (ctx.access_filter(decl)) {
+   if (ctx.access_guard(decl)) {
       ctx.add(node<RoutineDecl>(MethodDecl(
           decl.getNameAsString(), decl.getQualifiedNameAsString(),
           expect(ctx.header(decl), "failed to canonicalize source location"),
@@ -721,7 +741,7 @@ fn wrap(Context& ctx, const clang::CXXMethodDecl& decl) {
 }
 
 fn wrap(Context& ctx, const clang::EnumDecl& decl) {
-   if (ctx.access_filter(decl)) {
+   if (ctx.access_guard(decl)) {
       ctx.add(node<TypeDecl>(
           EnumTypeDecl(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
                        expect(ctx.header(decl), "failed to canonicalize source location"),
@@ -817,20 +837,30 @@ fn wrap(Context& ctx, const clang::Decl& decl) {
 #undef DISPATCH_ANY
 #undef DISCARD
 
-// Instantiate this class to do the work. The Config will grow in complexity to support
-// introspection to produce wrappers that make c++ devs jealous.
+/// The main executor of ensnare.
+///
+/// Responsible for building the translation unit, invoking the visitor, and writing the output.
 class BindAction : public clang::RecursiveASTVisitor<BindAction> {
    priv const Config& cfg;
    priv const std::unique_ptr<clang::ASTUnit> tu;
    priv Context ctx;
 
+   fn prefixed_search_paths() -> Vec<Str> {
+      Vec<Str> result;
+      for (const auto& search_path : Header::search_paths()) {
+         result.push_back("-isystem=" + search_path);
+      }
+      return result;
+   }
+
    // Load a translation unit from user provided arguments with additional include path
    // arguments.
    priv fn parse_tu() -> std::unique_ptr<clang::ASTUnit> {
       Vec<Str> args = {"-xc++"};
-      auto includes = include_paths();
-      args.insert(args.end(), includes.begin(), includes.end());
-      args.insert(args.end(), cfg.clang_args().begin(), cfg.clang_args().end());
+      auto search_paths = prefixed_search_paths();
+      args.insert(args.end(), search_paths.begin(), search_paths.end());
+      // The users args get placed after for higher priority.
+      args.insert(args.end(), cfg.user_clang_args().begin(), cfg.user_clang_args().end());
       return clang::tooling::buildASTFromCodeWithArgs(cfg.header_file(), args, "ensnare_headers.h",
                                                       "ensnare");
    }
@@ -844,6 +874,7 @@ class BindAction : public clang::RecursiveASTVisitor<BindAction> {
       os::write_file(os::set_file_ext(ctx.cfg.output(), ".nim"), output);
    }
 
+   /// Constuct and run ensnare.
    pub BindAction(const Config& cfg) : cfg(cfg), tu(parse_tu()), ctx(cfg, tu->getASTContext()) {
       // Collect all our declarations.
       auto result = TraverseAST(tu->getASTContext());
@@ -864,6 +895,7 @@ class BindAction : public clang::RecursiveASTVisitor<BindAction> {
    }
 };
 
+/// Entrypoint to the c++ part of ensnare.
 fn run(int argc, const char* argv[]) { BindAction _(Config(argc, argv)); }
 } // namespace ensnare
 

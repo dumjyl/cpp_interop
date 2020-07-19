@@ -20,54 +20,63 @@ template <typename Arg, typename... Args> fn write(std::ostream* out, Arg arg, A
    write(out, args...);
 }
 
-// Write some arguments to an ouput stream with a newline.
+/// Write some `args` to the ouput stream `out` with the `<<` operator.
 template <typename... Args> fn print(std::ostream* out, Args... args) {
    write(out, args...);
    write(out, '\n');
 }
 
-// Write some arguments to an `std::cout` with a newline.
+/// Write some `args` to the ouput stream `std::cout` with the `<<` operator.
 template <typename... Args> fn print(Args... args) { print(&std::cout, args...); }
 
-// Write some arguments to `std::cout` exit with error code 1.
+/// Print `args` and exit the application without the possibility of recovery.
 template <typename... Args> fn fatal [[noreturn]] (Args... args) {
    print("fatal-error: ", args...);
    std::exit(1);
 }
 
+/// Ensnare's goto growable heap buffer.
 template <typename T> using Vec = std::vector<T>;
 
+/// Ensnare's goto hash table.
 template <typename K, typename V> using Map = std::unordered_map<K, V>;
 
+/// Ensnare's goto byte character buffer.
 using Str = std::string;
 
+/// Ensnare's goto ref counting pointer.
 template <typename T> using Node = std::shared_ptr<T>;
 
-// Create a value ref counted node of type `Y` constructed from `X`.
+/// Construct a ref counted node with `Y(args...)`.
 template <typename Y, typename... Args> fn node(Args... args) -> Node<Y> {
    return std::make_shared<Y>(args...);
 }
 
+/// Ensnare's prefered way method of polymorphic object.
 template <typename... Variants> using Union = const std::variant<Variants...>;
 
-// Check if a `Union` is a thing. If it is you can `deref<T>(self)` it.
+/// Check if a `self` is of variant/type `T`. If it is, it safely be read like: `deref<T>(self)`.
 template <typename T, typename... Variants> fn is(const Node<Union<Variants...>>& self) -> bool {
    return std::holds_alternative<T, Variants...>(*self);
 }
 
+/// An immutable reference to the variant `T`. This will throw if the wrong variant is accessed.
 template <typename T, typename... Variants>
 fn deref(const Node<Union<Variants...>>& self) -> const T& {
    return std::get<T, Variants...>(*self);
 }
 
+/// Ensnare's goto class for encoding non-existence.
 template <typename T> using Opt = std::optional<T>;
 
-template <typename T> fn expect(Opt<T> result, const Str& msg) -> T {
-   if (result) {
-      return *result;
+/// Extract the value from `self` or exit fatally with `msg`.
+template <typename T> fn expect(Opt<T> self, const Str& msg) -> T {
+   if (self) {
+      return *self;
    } else {
       fatal("failed to unpack a none variant; " + msg);
    }
 }
 }; // namespace ensnare
+
 #include "ensnare/private/undef_syn.hpp"

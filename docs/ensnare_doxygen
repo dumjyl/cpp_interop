@@ -1,0 +1,6 @@
+PROJECT_NAME           = "ensnare"
+OUTPUT_DIRECTORY       = "bin"
+RECURSIVE              = YES
+INPUT                  = "src"
+INCLUDE_PATH           = "src"
+FILE_PATTERNS          = "*.hpp"
