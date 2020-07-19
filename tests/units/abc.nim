@@ -8,6 +8,14 @@ type
       a = 0
       b = 1
       c = 2
+   TypedefTest* {.import_cpp: "TypedefTest", header: "abc.hpp".} = object
+   `TypedefTest-TypedefNamedNamed`* {.import_cpp: "TypedefTest::TypedefNamedNamed", header: "abc.hpp".} = object
+   `TypedefTest-TypedefAnonNamed`* {.import_cpp: "TypedefTest::TypedefAnonNamed", header: "abc.hpp".} = object
+   `TypedefTest-TypedefNamedAnon`* {.import_cpp: "TypedefTest::TypedefNamedAnon", header: "abc.hpp".} = object
+   `type_of(XYZ-xyz_field)`* {.import_cpp: "decltype(XYZ::xyz_field)", header: "abc.hpp".} = object
+   XYZ* {.import_cpp: "XYZ", header: "abc.hpp".} = object
+      xyz_field: `type_of(XYZ-xyz_field`)
+   `type_of(anon_union_var)`* {.import_cpp: "decltype(anon_union_var)", header: "abc.hpp".} = object
 
 # --- routines
 
@@ -20,3 +28,4 @@ proc calc*(self: `blah-Foo`, x: CppInt): CppInt
 
 var
    `blah-x`* {.import_cpp: "blah::x", header: "abc.hpp".}: `blah-Foo`
+   anon_union_var* {.import_cpp: "anon_union_var", header: "abc.hpp".}: `type_of(anon_union_var)`

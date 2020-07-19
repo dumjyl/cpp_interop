@@ -1,258 +1,24 @@
+// FIXME: typedef handling with
+
 #pragma once
 
 #include "ensnare/private/bit_utils.hpp"
+#include "ensnare/private/config.hpp"
 #include "ensnare/private/headers.hpp"
 #include "ensnare/private/ir.hpp"
 #include "ensnare/private/os_utils.hpp"
+#include "ensnare/private/rendering.hpp"
 #include "ensnare/private/runtime.hpp"
 #include "ensnare/private/str_utils.hpp"
 #include "ensnare/private/utils.hpp"
 
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Tooling/Tooling.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/CommandLine.h"
 
 // preserve order
 #include "ensnare/private/syn.hpp"
 
 namespace ensnare {
-namespace cl {
-namespace cl = llvm::cl;
-cl::opt<bool> disable_includes("disable-includes",
-                               cl::desc("do not gather system includes. FIXME: not implimented"));
-cl::opt<Str> output(cl::Positional, cl::desc("output wrapper name/path"));
-cl::list<Str> args(cl::ConsumeAfter, cl::desc("clang args..."));
-} // namespace cl
-
-class Config {
-   READ_ONLY(Vec<Str>, headers);
-   READ_ONLY(Str, output);
-   READ_ONLY(Vec<Str>, clang_args);
-
-   pub Config(int argc, const char* argv[]) {
-      llvm::cl::ParseCommandLineOptions(argc, argv);
-      _output = cl::output;
-      for (const auto& arg : cl::args) {
-         if (os::is_cpp_file(arg)) {
-            _headers.push_back(arg);
-         } else {
-            _clang_args.push_back(arg);
-         }
-      }
-   };
-
-   // A header file with all the headers added together.
-   pub fn header_file() const -> Str {
-      if (_headers.size() == 0) {
-         fatal("no headers given");
-      } else {
-         Str result;
-         for (const auto& header : _headers) {
-            result += "#include ";
-            if (os::is_system_header(header)) {
-               result += header;
-            } else {
-               result += "\"" + header + "\"";
-            }
-            result += '\n';
-         }
-         return result;
-      };
-   }
-};
-
-namespace rendering {
-const std::size_t indent_size = 3;
-fn indent() -> Str {
-   Str result;
-   for (auto i = 0; i < indent_size; i += 1) {
-      result += ' ';
-   }
-   return result;
-}
-
-fn indent(const Str& str) -> Str {
-   Str result;
-   for (const auto line : split_newlines(str)) {
-      result += indent() + line + "\n";
-   }
-   return result;
-}
-
-fn render(const Node<Type>& type) -> Str;
-
-const llvm::StringSet nim_keywords(
-    {"nil",      "addr",      "asm",      "bind",   "mixin",    "block",     "break",   "do",
-     "continue", "defer",     "discard",  "cast",   "if",       "when",      "case",    "of",
-     "elif",     "else",      "end",      "except", "import",   "export",    "include", "from",
-     "as",       "is",        "isnot",    "div",    "mod",      "in",        "notin",   "not",
-     "and",      "or",        "xor",      "shl",    "shr",      "out",       "proc",    "func",
-     "method",   "converter", "template", "macro",  "iterator", "interface", "raise",   "return",
-     "finally",  "try",       "tuple",    "object", "enum",     "ptr",       "ref",     "distinct",
-     "concept",  "static",    "type",     "using",  "const",    "let",       "var",     "for",
-     "while",    "yield"});
-
-fn is_nim_keyword(const Str& str) -> bool { return nim_keywords.count(str) != 0; }
-
-fn needs_stropping(const Str& sym) { return is_nim_keyword(sym) || !is_ident_chars(sym); }
-
-fn render(const Node<Sym>& sym) -> Str {
-   auto result = sym->latest();
-   if (needs_stropping(result)) {
-      return "`" + result + "`";
-   } else {
-      return result;
-   }
-}
-
-fn render(const AtomType& typ) -> Str { return render(typ.name); }
-
-fn render(const PtrType& typ) -> Str { return "ptr " + render(typ.pointee); }
-
-fn render(const RefType& typ) -> Str { return "var " + render(typ.pointee); }
-
-fn render(const OpaqueType& typ) -> Str { return "object"; }
-
-fn render(const Node<Type>& type) -> Str {
-   if (is<AtomType>(type)) {
-      return render(deref<AtomType>(type));
-   } else if (is<PtrType>(type)) {
-      return render(deref<PtrType>(type));
-   } else if (is<RefType>(type)) {
-      return render(deref<RefType>(type));
-   } else if (is<OpaqueType>(type)) {
-      return render(deref<OpaqueType>(type));
-   } else {
-      fatal("unreachable: render(Type)");
-   }
-}
-
-fn render_pragmas(const Vec<Str>& pragmas) -> Str {
-   Str result = "{.";
-   for (const auto& pragma : pragmas) {
-      if (result.size() > 2) {
-         result += ", ";
-      }
-      result += pragma;
-   }
-   result += ".}";
-   return result;
-}
-
-fn render_colon(const Str& a, const Str& b) -> Str { return a + ": " + b; }
-
-fn import_cpp(const Str& pattern) -> Str { return "import_cpp: \"" + pattern + "\""; }
-
-fn header(const Str& header) -> Str { return "header: \"" + header + "\""; }
-
-fn render(const AliasTypeDecl& decl) -> Str {
-   return render(decl.name) + "* = " + render(decl.type) + "\n";
-}
-
-fn render(const EnumFieldDecl& decl) -> Str {
-   if (decl.val) {
-
-      return indent() + render(decl.name) + " = " + std::to_string(*decl.val) + '\n';
-   } else {
-      return indent() + render(decl.name) + '\n';
-   }
-}
-
-fn render(const EnumTypeDecl& decl) -> Str {
-   Str result = render(decl.name) + "* " +
-                render_pragmas({import_cpp(decl.cpp_name), header(decl.header)}) + " = enum\n";
-   for (const auto& field : decl.fields) {
-      result += render(field);
-   }
-   return result;
-}
-
-fn render(const RecordTypeDecl& decl) -> Str {
-   return render(decl.name) + "* " +
-          render_pragmas({import_cpp(decl.cpp_name), header(decl.header)}) + " = object\n";
-}
-
-fn render(const Node<TypeDecl>& decl) -> Str {
-   if (is<AliasTypeDecl>(decl)) {
-      return render(deref<AliasTypeDecl>(decl));
-   } else if (is<EnumTypeDecl>(decl)) {
-      return render(deref<EnumTypeDecl>(decl));
-   } else if (is<RecordTypeDecl>(decl)) {
-      return render(deref<RecordTypeDecl>(decl));
-   } else {
-      fatal("unreachable: render(TypeDecl)");
-   }
-}
-
-fn render(const ParamDecl& decl) -> Str { return render(decl.name) + ": " + render(decl.type); }
-
-fn render(const FunctionDecl& decl) -> Str {
-   auto result = "proc " + render(decl.name) + "*(";
-   auto first = true;
-   for (const auto& formal : decl.formals) {
-      if (not first) {
-         result += ", ";
-      }
-      result += render(formal);
-      first = false;
-   }
-   result += ")";
-   if (decl.return_type) {
-      result += ": ";
-      result += render(*decl.return_type);
-   }
-   result += "\n" + indent() +
-             render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
-   return result;
-}
-
-fn render(const ConstructorDecl& decl) -> Str {
-   Str result = "proc `{}`*(Self: type[";
-   result += render(decl.self) + "]";
-   for (const auto& formal : decl.formals) {
-      result += ", " + render(formal);
-   }
-   result += "): " + render(decl.self);
-   result += "\n" + indent() +
-             render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
-   return result;
-}
-
-fn render(const MethodDecl& decl) -> Str {
-   Str result = "proc " + render(decl.name) + "*(self: ";
-   result += render(decl.self);
-   for (const auto& formal : decl.formals) {
-      result += ", " + render(formal);
-   }
-   result += ")";
-   if (decl.return_type) {
-      result += ": ";
-      result += render(*decl.return_type);
-   }
-   result += "\n" + indent() +
-             render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
-   return result;
-}
-
-fn render(const Node<RoutineDecl>& decl) -> Str {
-   if (is<FunctionDecl>(decl)) {
-      return render(deref<FunctionDecl>(decl));
-   } else if (is<ConstructorDecl>(decl)) {
-      return render(deref<ConstructorDecl>(decl));
-   } else if (is<MethodDecl>(decl)) {
-      return render(deref<MethodDecl>(decl));
-   } else {
-      fatal("unreachable: render(FunctionDecl)");
-   }
-}
-
-fn render(const Node<VariableDecl>& decl) -> Str {
-   return render(decl->name) + "* " +
-          render_pragmas({import_cpp(decl->cpp_name), header(decl->header)}) + ": " +
-          render(decl->type) + "\n";
-}
-} // namespace rendering
 
 // The cananonical types defined in runtime.nim
 class Builtins {
@@ -305,7 +71,15 @@ class Context {
 
    pub const Config& cfg;
    pub const Builtins builtins;
-   pub Context(const Config& cfg, const clang::ASTContext& ast_ctx) : cfg(cfg), ast_ctx(ast_ctx) {}
+   priv std::size_t alt_counter;
+   pub Context(const Config& cfg, const clang::ASTContext& ast_ctx)
+      : cfg(cfg), ast_ctx(ast_ctx), alt_counter(0) {}
+
+   pub fn inc_alt() { alt_counter += 1; }
+
+   pub fn dec_alt() { alt_counter -= 1; }
+
+   pub fn alt() -> bool { return alt_counter != 0; }
 
    pub fn filename(const clang::SourceLocation& loc) const -> llvm::StringRef {
       return ast_ctx.getSourceManager().getFilename(loc);
@@ -360,13 +134,9 @@ class Context {
 //`QualType` or / even some kinds of `Stmt` (a decltype for example).
 //
 
-#define WRAP(T) fn wrap(Context& ctx, const clang::T##Decl& decl) -> void
+fn wrap(Context& ctx, const clang::NamedDecl& decl) -> void;
 
-#define MAP(T) fn map(Context& ctx, T entity) -> Node<Type>
-
-fn wrap(Context& ctx, const clang::Decl& decl) -> void;
-MAP(const clang::Decl&);
-MAP(const clang::Type&);
+fn map(Context& ctx, const clang::Type& decl) -> Node<Type>;
 
 template <typename T> fn map(Context& ctx, const T* entity) {
    if (entity) {
@@ -378,7 +148,7 @@ template <typename T> fn map(Context& ctx, const T* entity) {
 
 // Maps to an atomic type of some kind. Many of these are obscure and
 // unsupported.
-MAP(const clang::BuiltinType&) {
+fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
    switch (entity.getKind()) {
       case clang::BuiltinType::Kind::OCLImage1dRO:
       case clang::BuiltinType::Kind::OCLImage1dArrayRO:
@@ -553,12 +323,6 @@ MAP(const clang::BuiltinType&) {
          return ctx.builtins._float128;
       case clang::BuiltinType::Kind::NullPtr: // type of 'nullptr'
          return ctx.builtins._nullptr;
-      /* FIXME:
-         pub TypeNode _size_t = Builtins::init("cpp_size_t");
-         pub TypeNode _ptrdiff_t = Builtins::init("cpp_ptrdiff_t");
-         pub TypeNode _max_align_t = Builtins::init("cpp_max_align_t");
-         pub TypeNode _byte = Builtins::init("cpp_byte");
-      */
       default:
          entity.dump();
          fatal("unreachable: builtin type: ",
@@ -566,7 +330,7 @@ MAP(const clang::BuiltinType&) {
    }
 } // namespace ensnare::ct
 
-MAP(clang::QualType) {
+fn map(Context& ctx, const clang::QualType& entity) -> Node<Type> {
    // Too niche to care about for now.
    if (entity.isRestrictQualified() || entity.isVolatileQualified()) {
       fatal("volatile and restrict qualifiers unsupported");
@@ -585,7 +349,7 @@ MAP(clang::QualType) {
    }
 }
 
-MAP(Node<TypeDecl>) {
+fn map(Context& ctx, const Node<TypeDecl>& entity) -> Node<Type> {
    if (is<AliasTypeDecl>(entity)) {
       return node<Type>(AtomType(deref<AliasTypeDecl>(entity).name));
    } else if (is<EnumTypeDecl>(entity)) {
@@ -597,19 +361,27 @@ MAP(Node<TypeDecl>) {
    }
 }
 
-MAP(const clang::ElaboratedType&) { return map(ctx, entity.getNamedType()); }
+fn map(Context& ctx, const clang::ElaboratedType& entity) -> Node<Type> {
+   return map(ctx, entity.getNamedType());
+}
 
-MAP(const clang::NamedDecl&) {
-   auto type = ctx.lookup(entity);
+fn alt_wrap(Context& ctx, const clang::NamedDecl& decl) {
+   ctx.inc_alt();
+   wrap(ctx, decl);
+   ctx.dec_alt();
+}
+
+fn map(Context& ctx, const clang::NamedDecl& decl) -> Node<Type> {
+   auto type = ctx.lookup(decl);
    if (type) {
       return *type;
    } else {
-      wrap(ctx, entity);
-      auto type = ctx.lookup(entity);
+      alt_wrap(ctx, decl);
+      auto type = ctx.lookup(decl);
       if (type) {
          return *type;
       } else {
-         entity.dump();
+         decl.dump();
          fatal("failed to map type");
       }
    }
@@ -618,17 +390,23 @@ MAP(const clang::NamedDecl&) {
 // FIXME: add the restrict_wrap counter.
 
 // If a `Type` has a `Decl` representation, always map that. It seems to work.
-MAP(const clang::TypedefType&) { return map(ctx, entity.getDecl()); }
+fn map(Context& ctx, const clang::TypedefType& type) -> Node<Type> {
+   return map(ctx, type.getDecl());
+}
 
-MAP(const clang::RecordType&) { return map(ctx, entity.getDecl()); }
+fn map(Context& ctx, const clang::RecordType& type) -> Node<Type> { return map(ctx, type.getDecl()); }
 
-MAP(const clang::EnumType&) { return map(ctx, entity.getDecl()); }
+fn map(Context& ctx, const clang::EnumType& type) -> Node<Type> { return map(ctx, type.getDecl()); }
 
-MAP(const clang::PointerType&) { return node<Type>(PtrType(map(ctx, entity.getPointeeType()))); }
+fn map(Context& ctx, const clang::PointerType& type) -> Node<Type> {
+   return node<Type>(PtrType(map(ctx, type.getPointeeType())));
+}
 
-MAP(const clang::ReferenceType&) { return node<Type>(RefType(map(ctx, entity.getPointeeType()))); }
+fn map(Context& ctx, const clang::ReferenceType& type) -> Node<Type> {
+   return node<Type>(RefType(map(ctx, type.getPointeeType())));
+}
 
-MAP(const clang::VectorType&) {
+fn map(Context& ctx, const clang::VectorType& type) -> Node<Type> {
    // The hope is that this is an aliased type as part of `typedef` / `using`
    // and the internals don't matter.
    return node<Type>(OpaqueType());
@@ -644,9 +422,52 @@ MAP(const clang::VectorType&) {
    // }
 }
 
-MAP(const clang::ParenType&) { return map(ctx, entity.getInnerType()); }
+fn map(Context& ctx, const clang::ParenType& type) -> Node<Type> {
+   return map(ctx, type.getInnerType());
+}
 
-MAP(const clang::DecltypeType&) { return map(ctx, entity.getUnderlyingType()); }
+fn map(Context& ctx, const clang::DecltypeType& type) -> Node<Type> {
+   return map(ctx, type.getUnderlyingType());
+}
+
+fn map(Context& ctx, const clang::EnumDecl::enumerator_range fields) -> Vec<EnumFieldDecl> {
+   Vec<EnumFieldDecl> result;
+   for (auto field : fields) {
+      // FIXME: expose if a value was explicitly provided.
+      // auto expr = field->getInitExpr();
+      // if (expr) {
+      // } else {
+      // }
+      result.push_back(EnumFieldDecl(field->getNameAsString(), field->getInitVal().getExtValue()));
+   }
+   return result;
+}
+
+#define DISPATCH(kind)                                                                             \
+   case clang::Type::TypeClass::kind: {                                                            \
+      return map(ctx, llvm::cast<clang::kind##Type>(entity));                                      \
+   }
+
+fn map(Context& ctx, const clang::Type& entity) -> Node<Type> {
+   switch (entity.getTypeClass()) {
+      DISPATCH(Builtin);
+      DISPATCH(Elaborated);
+      DISPATCH(Record);
+      DISPATCH(Enum);
+      DISPATCH(Pointer);
+      DISPATCH(LValueReference);
+      DISPATCH(RValueReference);
+      DISPATCH(Typedef);
+      DISPATCH(Vector);
+      DISPATCH(Paren);
+      DISPATCH(Decltype);
+      default:
+         entity.dump();
+         fatal("unhandled mapping: ", entity.getTypeClassName());
+   }
+}
+
+#undef DISPATCH
 
 // return a suitable name from a named declaration.
 fn nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
@@ -673,102 +494,21 @@ fn nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
    }
 }
 
+fn decl_contexts(const clang::NamedDecl& decl) -> llvm::SmallVector<const clang::DeclContext*, 8> {
+   llvm::SmallVector<const clang::DeclContext*, 8> result;
+   const clang::DeclContext* ctx = decl.getDeclContext();
+   while (ctx) {
+      if (llvm::isa<clang::NamedDecl>(ctx)) {
+         result.push_back(ctx);
+      }
+      ctx = ctx->getParent();
+   }
+   return result;
+}
+
+fn has_name(const clang::TagDecl& decl) -> bool { return decl.getIdentifier(); }
+
 fn qualified_nim_name(Context& ctx, const clang::NamedDecl& decl) -> Str {
-   /*
-   FIXME: steal this without the bad parts.
-
-   const DeclContext* Ctx = getDeclContext();
-
-   // For ObjC methods and properties, look through categories and use the
-   // interface as context.
-   if (auto* MD = dyn_cast<ObjCMethodDecl>(this)) {
-      if (auto* ID = MD->getClassInterface()) {
-         Ctx = ID;
-      }
-   }
-   if (auto* PD = dyn_cast<ObjCPropertyDecl>(this)) {
-      if (auto* MD = PD->getGetterMethodDecl()) {
-         if (auto* ID = MD->getClassInterface()) {
-            Ctx = ID;
-         }
-      }
-   }
-
-   if (Ctx->isFunctionOrMethod())
-   {return;}
-
-   using ContextsTy = SmallVector<const DeclContext*, 8>;
-   ContextsTy Contexts;
-
-   // Collect named contexts.
-   while (Ctx) {
-      if (isa<NamedDecl>(Ctx)) {
-         Contexts.push_back(Ctx); }
-      Ctx = Ctx->getParent();
-   }
-
-   for (const DeclContext* DC : llvm::reverse(Contexts)) {
-      if (const auto* Spec = dyn_cast<ClassTemplateSpecializationDecl>(DC)) {
-         OS << Spec->getName();
-         const TemplateArgumentList& TemplateArgs = Spec->getTemplateArgs();
-         printTemplateArgumentList(OS, TemplateArgs.asArray(), P);
-      } else if (const auto* ND = dyn_cast<NamespaceDecl>(DC)) {
-         if (P.SuppressUnwrittenScope && (ND->isAnonymousNamespace() || ND->isInline())) {
-            continue;
-         }
-         if (ND->isAnonymousNamespace()) {
-            OS << (P.MSVCFormatting ? "`anonymous namespace\'" : "(anonymous namespace)");
-         } else {
-            OS << *ND;
-         }
-      } else if (const auto* RD = dyn_cast<RecordDecl>(DC)) {
-         if (!RD->getIdentifier()) {
-            OS << "(anonymous " << RD->getKindName() << ')';
-         } else {
-            OS << *RD;
-         }
-      } else if (const auto* FD = dyn_cast<FunctionDecl>(DC)) {
-         const FunctionProtoType* FT = nullptr;
-         if (FD->hasWrittenPrototype()) {
-            FT = dyn_cast<FunctionProtoType>(FD->getType()->castAs<FunctionType>());
-         }
-
-         OS << *FD << '(';
-         if (FT) {
-            unsigned NumParams = FD->getNumParams();
-            for (unsigned i = 0; i < NumParams; ++i) {
-               if (i) {
-                  OS << ", ";
-               }
-               OS << FD->getParamDecl(i)->getType().stream(P);
-            }
-
-            if (FT->isVariadic()) {
-               if (NumParams > 0) {
-                  OS << ", ";
-               }
-               OS << "...";
-            }
-         }
-         OS << ')';
-      } else if (const auto* ED = dyn_cast<EnumDecl>(DC)) {
-         // C++ [dcl.enum]p10: Each enum-name and each unscoped
-         // enumerator is declared in the scope that immediately contains
-         // the enum-specifier. Each scoped enumerator is declared in the
-         // scope of the enumeration.
-         // For the case of unscoped enumerator, do not include in the qualified
-         // name any information about its enum enclosing scope, as its visibility
-         // is global.
-         if (ED->isScoped())
-            OS << *ED;
-         else
-            continue;
-      } else {
-         OS << *cast<NamedDecl>(DC);
-      }
-      OS << "::";
-   }
-   */
    // auto name = decl.getDeclName();
    // switch (name.getNameKind()) {
    // case clang::DeclarationName::NameKind::Identifier: {
@@ -803,12 +543,31 @@ template <typename T> fn get_definition(const T& decl) -> const T& {
    }
 }
 
-WRAP(Record) {
-   RecordTypeDecl record(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
-                         expect(ctx.header(decl), "failed to canonicalize source location"));
-   auto type_decl = node<TypeDecl>(record);
-   ctx.set(decl, map(ctx, type_decl));
-   ctx.add(type_decl);
+fn wrap(Context& ctx, const clang::RecordDecl& decl, bool force_wrap = false) {
+   if (has_name(decl) || force_wrap) {
+      RecordTypeDecl record(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
+                            expect(ctx.header(decl), "failed to canonicalize source location"));
+      auto type_decl = node<TypeDecl>(record);
+      ctx.set(decl, map(ctx, type_decl));
+      ctx.add(type_decl);
+   }
+}
+
+fn wrap(Context& ctx, const clang::CXXRecordDecl::method_range methods) {
+   for (auto method : methods) {
+      if (method) {
+         wrap(ctx, *method);
+      } else {
+         fatal("unreachable: wrap method");
+      }
+   }
+}
+
+fn wrap(Context& ctx, const clang::CXXRecordDecl& decl) {
+   if (has_name(decl)) {
+      wrap(ctx, static_cast<const clang::RecordDecl&>(decl));
+      wrap(ctx, decl.methods());
+   }
 }
 
 fn get_cstddef_item(Context& ctx, const clang::NamedDecl& decl) -> Opt<Node<Type>> {
@@ -824,27 +583,38 @@ fn get_cstddef_item(Context& ctx, const clang::NamedDecl& decl) -> Opt<Node<Type
    }
 }
 
-WRAP(TypedefName) {
+fn wrap_alias(Context& ctx, const clang::TypedefNameDecl& decl) {
+   auto qualified_name = decl.getQualifiedNameAsString();
+   AliasTypeDecl alias(qualified_nim_name(ctx, decl), map(ctx, decl.getUnderlyingType()));
+   auto type_decl = node<TypeDecl>(alias);
+   ctx.set(decl, map(ctx, type_decl));
+   ctx.add(type_decl);
+}
+
+// This means it names an unnamed type
+fn defines_type(const clang::TypedefNameDecl& decl) -> bool {
+   const auto tag = llvm::dyn_cast<clang::TagType>(decl.getUnderlyingType());
+   return tag && !has_name(*tag->getDecl());
+}
+
+fn wrap(Context& ctx, const clang::TypedefNameDecl& decl) {
    // This could be c++ `TypeAliasDecl` or a `TypedefDecl`.
    // Either way, we produce `type AliasName* = UnderlyingType`
 
-   if (decl.getKind() == clang::Decl::Kind::ObjCTypeParam) {
-      fatal("obj-c is unsupported");
-   } else {
-      // header_check(ctx.filename(decl.getLocation))
-      // if (!ctx.file_filter(decl)) {
-      //   return;
-      //}
-      auto cstddef_item = get_cstddef_item(ctx, decl);
-      if (cstddef_item) {
-         ctx.set(decl, *cstddef_item);
+   // We map certain typedefs from the stdlib to builtins.
+   auto cstddef_item = get_cstddef_item(ctx, decl);
+   if (cstddef_item) {
+      ctx.set(decl, *cstddef_item);
+   } else if (defines_type(decl)) {
+      // The inner type is an unnamed tag type. It has not been wrapped yet.
+      // FIXME
+      if (const auto record_decl = llvm::dyn_cast<clang::CXXRecordDecl>(tag_decl)) {
+
       } else {
-         auto qualified_name = decl.getQualifiedNameAsString();
-         AliasTypeDecl alias(qualified_nim_name(ctx, decl), map(ctx, decl.getUnderlyingType()));
-         auto type_decl = node<TypeDecl>(alias);
-         ctx.set(decl, map(ctx, type_decl));
-         ctx.add(type_decl);
+         fatal("unreachable: anon tag typedef");
       }
+   } else {
+      wrap_alias(ctx, decl);
    }
 }
 
@@ -860,7 +630,7 @@ fn wrap_formals(Context& ctx, const clang::FunctionDecl& decl) -> Vec<ParamDecl>
    return result;
 }
 
-fn map_return_type(Context& ctx, const clang::FunctionDecl& decl) -> Opt<Node<Type>> {
+fn wrap_return_type(Context& ctx, const clang::FunctionDecl& decl) -> Opt<Node<Type>> {
    auto result = decl.getReturnType();
    if (result->isVoidType()) {
       return {};
@@ -875,14 +645,14 @@ fn wrap_non_template(Context& ctx, const clang::FunctionDecl& decl) {
    ctx.add(node<RoutineDecl>(
        FunctionDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
                     expect(ctx.header(decl), "failed to canonicalize source location"),
-                    wrap_formals(ctx, decl), map_return_type(ctx, decl))));
+                    wrap_formals(ctx, decl), wrap_return_type(ctx, decl))));
 }
 
 fn is_visible(const clang::VarDecl& decl) -> bool {
    return decl.hasGlobalStorage() && !decl.isStaticLocal();
 }
 
-WRAP(Var) {
+fn wrap(Context& ctx, const clang::VarDecl& decl) {
    if (ctx.access_filter(decl) && is_visible(decl)) {
       ctx.add(node<VariableDecl>(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
                                  expect(ctx.header(decl), "failed to canonicalize source location"),
@@ -890,7 +660,7 @@ WRAP(Var) {
    }
 }
 
-WRAP(Function) {
+fn wrap(Context& ctx, const clang::FunctionDecl& decl) {
    switch (decl.getTemplatedKind()) {
       case clang::FunctionDecl::TK_NonTemplate:
          wrap_non_template(ctx, decl);
@@ -913,7 +683,7 @@ fn wrap_non_template(Context& ctx, const clang::CXXConstructorDecl& decl) {
    }
 }
 
-WRAP(CXXConstructor) {
+fn wrap(Context& ctx, const clang::CXXConstructorDecl& decl) {
    switch (decl.getTemplatedKind()) {
       case clang::FunctionDecl::TK_NonTemplate:
          wrap_non_template(ctx, decl);
@@ -932,11 +702,11 @@ fn wrap_non_template(Context& ctx, const clang::CXXMethodDecl& decl) {
       ctx.add(node<RoutineDecl>(MethodDecl(
           decl.getNameAsString(), decl.getQualifiedNameAsString(),
           expect(ctx.header(decl), "failed to canonicalize source location"),
-          map(ctx, decl.getParent()), wrap_formals(ctx, decl), map_return_type(ctx, decl))));
+          map(ctx, decl.getParent()), wrap_formals(ctx, decl), wrap_return_type(ctx, decl))));
    }
 }
 
-WRAP(CXXMethod) {
+fn wrap(Context& ctx, const clang::CXXMethodDecl& decl) {
    switch (decl.getTemplatedKind()) {
       case clang::FunctionDecl::TK_NonTemplate:
          wrap_non_template(ctx, decl);
@@ -950,20 +720,7 @@ WRAP(CXXMethod) {
    }
 }
 
-fn map(Context& ctx, clang::EnumDecl::enumerator_range fields) -> Vec<EnumFieldDecl> {
-   Vec<EnumFieldDecl> result;
-   for (auto field : fields) {
-      // FIXME: expose if a value was explicitly provided.
-      // auto expr = field->getInitExpr();
-      // if (expr) {
-      // } else {
-      // }
-      result.push_back(EnumFieldDecl(field->getNameAsString(), field->getInitVal().getExtValue()));
-   }
-   return result;
-}
-
-WRAP(Enum) {
+fn wrap(Context& ctx, const clang::EnumDecl& decl) {
    if (ctx.access_filter(decl)) {
       ctx.add(node<TypeDecl>(
           EnumTypeDecl(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
@@ -971,32 +728,6 @@ WRAP(Enum) {
                        map(ctx, decl.enumerators()))));
    }
 }
-
-#define DISPATCH(kind)                                                                             \
-   case clang::Type::TypeClass::kind: {                                                            \
-      return map(ctx, llvm::cast<clang::kind##Type>(entity));                                      \
-   }
-
-MAP(const clang::Type&) {
-   switch (entity.getTypeClass()) {
-      DISPATCH(Builtin);
-      DISPATCH(Elaborated);
-      DISPATCH(Record);
-      DISPATCH(Enum);
-      DISPATCH(Pointer);
-      DISPATCH(LValueReference);
-      DISPATCH(RValueReference);
-      DISPATCH(Typedef);
-      DISPATCH(Vector);
-      DISPATCH(Paren);
-      DISPATCH(Decltype);
-      default:
-         entity.dump();
-         fatal("unhandled mapping: ", entity.getTypeClassName());
-   }
-}
-
-#undef DISPATCH
 
 // This will call `wrap(clang::kind##Decl)` within the dispatch case.
 #define DISPATCH(kind)                                                                             \
@@ -1018,25 +749,28 @@ MAP(const clang::Type&) {
       break;                                                                                       \
    }
 
-// _switch<Typedef>(decl, );
-
-WRAP(Named) {
+fn wrap(Context& ctx, const clang::NamedDecl& decl) -> void {
    auto header = ctx.header(decl);
    if (header) {
       switch (decl.getKind()) {
+         // DISCARD(Record); // We should not get these here.
+         DISCARD(Namespace); // FIXME: doing something with this would be good.
          DISCARD(NamespaceAlias);
-         DISCARD(Namespace);
-         DISCARD(Field);
+         DISCARD(Field); // handled in RecordDecl
          DISCARD(ParmVar);
-         DISCARD(Using);
-         DISCARD(EnumConstant);
+         DISCARD(Using); // not relevant
 
-         DISPATCH_ANY(TypedefName);
-         DISPATCH_ANY(Record);
+         DISCARD(EnumConstant); // handled in EnumDecl
+
+         DISCARD(CXXMethod);      // handled in CXXRecordDecl
+         DISCARD(CXXConstructor); // handled in CXXRecordDecl
+         DISCARD(CXXDestructor);  // handled in CXXRecordDecl
+
+         DISPATCH(TypeAlias);
+         DISPATCH(Typedef);
+         DISPATCH(CXXRecord);
          DISPATCH(Enum);
-         DISPATCH(Function);
-         DISPATCH(CXXMethod);
-         DISPATCH(CXXConstructor);
+         DISPATCH(Function); // A free function
          DISPATCH(Var);
          default:
             decl.dump();
@@ -1045,7 +779,7 @@ WRAP(Named) {
    }
 }
 
-fn wrap(Context& ctx, const clang::Decl& decl) -> void {
+fn wrap(Context& ctx, const clang::Decl& decl) {
    switch (decl.getKind()) {
       // pre NamedDecls
       DISCARD(AccessSpec);
@@ -1061,7 +795,7 @@ fn wrap(Context& ctx, const clang::Decl& decl) -> void {
       DISCARD(Import);
       DISCARD(LifetimeExtendedTemporary);
       DISCARD(LinkageSpec);
-      // after NamedDecls
+      // post NamedDecls
       DISCARD(ObjCPropertyImpl);
       DISCARD(OMPAllocate);
       DISCARD(OMPRequires);
@@ -1078,10 +812,6 @@ fn wrap(Context& ctx, const clang::Decl& decl) -> void {
          fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
    }
 }
-
-#undef WRAP
-#undef NO_WRAP
-#undef MAP
 
 #undef DISPATCH
 #undef DISPATCH_ANY
@@ -1108,26 +838,9 @@ class BindAction : public clang::RecursiveASTVisitor<BindAction> {
    // Render and write out our decls.
    priv fn finalize() {
       Str output = "import ensnare/runtime\n";
-      if (ctx.type_decls().size() != 0) {
-         output += "\n# --- types\n\n";
-         output += "type\n";
-         for (const auto& type_decl : ctx.type_decls()) {
-            output += rendering::indent(rendering::render(type_decl));
-         }
-      }
-      if (ctx.routine_decls().size() != 0) {
-         output += "\n# --- routines\n\n";
-         for (const auto& routine_decl : ctx.routine_decls()) {
-            output += rendering::render(routine_decl);
-         }
-      }
-      if (ctx.variable_decls().size() != 0) {
-         output += "\n# --- variables\n\n";
-         output += "var\n";
-         for (const auto& variable_decl : ctx.variable_decls()) {
-            output += rendering::indent(rendering::render(variable_decl));
-         }
-      }
+      output += render(ctx.type_decls());
+      output += render(ctx.routine_decls());
+      output += render(ctx.variable_decls());
       os::write_file(os::set_file_ext(ctx.cfg.output(), ".nim"), output);
    }
 

@@ -4,9 +4,11 @@ cpp_compile_src("ensnare"/"private"/"os_utils.cpp")
 cpp_compile_src("ensnare"/"private"/"str_utils.cpp")
 cpp_compile_src("ensnare"/"private"/"headers.cpp")
 cpp_compile_src("ensnare"/"private"/"ir.cpp")
+cpp_compile_src("ensnare"/"private"/"config.cpp")
+cpp_compile_src("ensnare"/"private"/"rendering.cpp")
 build.flags()
 
-const hpp = CppSrc{"ensnare/private/ensnare.hpp"}
+const hpp = CppSrc{"ensnare/private/main.hpp"}
 
 proc `ensnare-run`(argc: CppInt, argv: CppUnsizedArray[CppCharPtr]) {.cpp_load: hpp.}
 
