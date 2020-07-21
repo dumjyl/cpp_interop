@@ -5,7 +5,7 @@
 #include <limits>
 #include <type_traits>
 
-// preserve order
+//
 #include "ensnare/private/syn.hpp"
 
 namespace ensnare {
@@ -29,12 +29,12 @@ template <typename T> constexpr fn decode(std::size_t val) -> T {
    return static_cast<T>(val) ^ static_cast<T>(signed_bias<T>());
 }
 
-template <typename T, std::enable_if_t<std::numeric_limits<T>::is_integer, int> = 0>
+template <typename T, typename std::enable_if_t<std::numeric_limits<T>::is_integer, int> = 0>
 constexpr fn type_size() -> std::size_t {
    return encode(std::numeric_limits<T>::max()) - encode(std::numeric_limits<T>::min()) + 1;
 }
 
-template <typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
+template <typename T, typename std::enable_if_t<std::is_enum_v<T>, int> = 0>
 constexpr fn type_size() -> std::size_t {
    return type_size<std::underlying_type_t<T>>();
 }

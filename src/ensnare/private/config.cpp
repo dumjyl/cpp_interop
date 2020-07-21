@@ -46,4 +46,18 @@ fn ensnare::Config::header_file() const -> Str {
    };
 }
 
+fn ensnare::Config::dump() const -> void {
+   print("Config:");
+   print("   output: ", _output);
+   for (const auto& header : _headers) {
+      print("   header: ", Str(header));
+   }
+   for (const auto& arg : _user_clang_args) {
+      print("   clang arg: ", arg);
+   }
+   for (const auto& sym : _syms) {
+      print("   sym: ", sym);
+   }
+}
+
 #include "ensnare/private/undef_syn.hpp"

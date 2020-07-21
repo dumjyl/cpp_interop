@@ -1,6 +1,7 @@
 import ensnare/private/[os_utils, app_utils], std/os
+from strutils import indent
 
-const tests = ["abc"]
+const tests = ["typedefs", "abc"]
 
 proc nim_gen_file(name: string): string = "tests"/"units"/"gen"/name.change_file_ext(".nim")
 
@@ -28,10 +29,12 @@ proc units =
             echo "Test Failure: ", test
             echo "Code: ", code
             echo "Diff:\n", diff_output
+            quit 1
       else:
          echo "Test Failure: ", test
          echo "Code: ", code
-         echo "Output:\n", output
+         echo "Output:\n", indent(output, 3)
+         quit 1
 
 main:
    units()

@@ -3,4 +3,8 @@ OUTPUT_DIRECTORY       = "bin"
 RECURSIVE              = YES
 INPUT                  = "src"
 INCLUDE_PATH           = "src"
-FILE_PATTERNS          = "*.hpp"
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+PREDEFINED             = "pub=public:" \
+                         "priv=private:"

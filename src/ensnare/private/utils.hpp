@@ -1,7 +1,11 @@
+/// \file
+/// Core utilities for ensnare.
+
 #pragma once
 
 #include <iostream>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -12,22 +16,25 @@
 
 namespace ensnare {
 // Template recursion base case.
-template <typename... Args> fn write(std::ostream* out, Args... args) {}
+template <typename... Args> fn write(std::ostream& out, Args... args) {}
 
 // Write some arguments to a output stream.
-template <typename Arg, typename... Args> fn write(std::ostream* out, Arg arg, Args... args) {
-   *out << arg;
+template <typename Arg, typename... Args> fn write(std::ostream& out, Arg arg, Args... args) {
+   out << arg;
    write(out, args...);
 }
 
 /// Write some `args` to the ouput stream `out` with the `<<` operator.
-template <typename... Args> fn print(std::ostream* out, Args... args) {
+template <typename... Args> fn print(std::ostream& out, Args... args) {
    write(out, args...);
-   write(out, '\n');
+   out << '\n';
 }
 
 /// Write some `args` to the ouput stream `std::cout` with the `<<` operator.
-template <typename... Args> fn print(Args... args) { print(&std::cout, args...); }
+template <typename... Args> fn print(Args... args) { print(std::cout, args...); }
+
+/// Write some `args` to the ouput stream `std::cerr` with the `<<` operator.
+template <typename... Args> fn print_err(Args... args) { print(std::cerr, args...); }
 
 /// Print `args` and exit the application without the possibility of recovery.
 template <typename... Args> fn fatal [[noreturn]] (Args... args) {
@@ -68,6 +75,9 @@ fn deref(const Node<Union<Variants...>>& self) -> const T& {
 
 /// Ensnare's goto class for encoding non-existence.
 template <typename T> using Opt = std::optional<T>;
+
+/// Ensnare's goto class for encoding non-existence for refernces.
+template <typename T> using OptRef = std::optional<std::reference_wrapper<T>>;
 
 /// Extract the value from `self` or exit fatally with `msg`.
 template <typename T> fn expect(Opt<T> self, const Str& msg) -> T {

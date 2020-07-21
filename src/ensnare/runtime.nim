@@ -139,44 +139,6 @@ cpp_static_assert(cpp_standard >= 201703.CppLong, "c++17 or later is required".c
 #cpp_static_assert(cpp_size_of(cpp_int) == 4, "Only LP64 systems are supported")
 #cpp_static_assert(cpp_size_of(cpp_long) == 8, "Only LP64 systems are supported")
 
-proc split_namespace(self: NimNode): seq[NimNode] =
-   for ident in self:
-      if not (ident ~= "-"):
-         result.add(ident)
-
-type CppSrc* = object
-   dir: string
-   name: string
-   ext: string
-
-template `{}`*(Self: type[CppSrc], src: string): Self =
-   var (dir, name, ext) = split_file(src)
-   #if not is_absolute(dir):
-   #   dir = split_file(instantiation_info(-1, true).filename).dir
-   CppSrc(dir: dir, name: name, ext: ext)
-
-proc import_name(ns_parts: openarray[NimNode]): string =
-   var first = true
-   for ns_part in ns_parts:
-      if not first:
-         result &= "::"
-      result = result & $ns_part
-      first = false
-   result &= "(@)"
-
-macro cpp_load*(src: static[CppSrc], decl: untyped): auto =
-   result = decl
-   let ns_parts = split_namespace(decl[0])
-   decl[0] = ns_parts[^1]
-   let import_name = import_name(ns_parts)
-   if decl[4] of nnkEmpty:
-      decl[4] = !({.import_cpp: `import_name`.})
-   else: assert(false, "FIXME")
-   case src.ext:
-   of ".hpp":
-      decl[4].add(nnkExprColonExpr{"header", lit(src.dir/src.name&src.ext)})
-   else: decl.fatal("unsupported extension")
-
 template cpp_forward_compiler*(arg: static[string]) =
    {.pass_c: arg.}
 

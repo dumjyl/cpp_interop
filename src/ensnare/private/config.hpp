@@ -11,7 +11,6 @@
 #include "ensnare/private/syn.hpp"
 
 namespace ensnare {
-
 /// A configuration class responsible for managing command line options.
 class Config {
    priv Vec<Header> _headers;
@@ -37,6 +36,8 @@ class Config {
    pub Config(int argc, const char* argv[]);
    /// A header file with all the headers"()" rendered together.
    pub fn header_file() const -> Str;
+   /// Dump the config to stdout.
+   pub fn dump() const -> void;
 };
 } // namespace ensnare
 

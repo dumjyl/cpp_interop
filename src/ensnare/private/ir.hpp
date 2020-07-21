@@ -1,5 +1,8 @@
 /// \file
-/// Most of these type appear inside a `Union<_>` or a `Node<Union<_>>`
+/// All of the types that are not Unions appear inside a `Node<_>` or a `Node<Union<_>>`
+///
+/// This is a symbolized IR. Prudence must be taken to not produce distinct nodes for the same
+/// entity.
 
 #pragma once
 
