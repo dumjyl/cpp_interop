@@ -59,7 +59,7 @@ template <typename Y, typename... Args> fn node(Args... args) -> Node<Y> {
    return std::make_shared<Y>(args...);
 }
 
-/// Ensnare's prefered way method of polymorphic object.
+/// Ensnare's prefered method for polymorphic object.
 template <typename... Variants> using Union = const std::variant<Variants...>;
 
 /// Check if a `self` is of variant/type `T`. If it is, it safely be read like: `deref<T>(self)`.

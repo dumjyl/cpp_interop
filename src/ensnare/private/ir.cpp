@@ -3,17 +3,23 @@
 // preserve order
 #include "ensnare/private/syn.hpp"
 
-ensnare::Sym::Sym(const Str& name) : detail({name}) {}
+ensnare::Sym::Sym(const Str& name, bool no_stropping)
+   : detail({name}), _no_stropping(no_stropping) {}
 
-fn ensnare::Sym::latest() -> Str { return detail.back(); }
+fn ensnare::Sym::latest() const -> Str { return detail.back(); }
 
-ensnare::AtomType::AtomType(const Node<Sym>& name) : name(name) {}
+fn ensnare::Sym::no_stropping() const -> bool { return _no_stropping; }
 
-ensnare::AtomType::AtomType(const Str& name) : name(node<Sym>(name)) {}
+ensnare::AtomType::AtomType(const Node<Sym> name) : name(name) {}
 
-ensnare::PtrType::PtrType(Node<Type> pointee) : pointee(pointee) {}
+ensnare::AtomType::AtomType(const Str name) : name(node<Sym>(name)) {}
 
-ensnare::RefType::RefType(Node<Type> pointee) : pointee(pointee) {}
+ensnare::PtrType::PtrType(const Node<Type> pointee) : pointee(pointee) {}
+
+ensnare::RefType::RefType(const Node<Type> pointee) : pointee(pointee) {}
+
+ensnare::InstType::InstType(const Node<Sym> name, const Vec<Node<Type>> types)
+   : name(name), types(types) {}
 
 ensnare::AliasTypeDecl::AliasTypeDecl(const Str name, const Node<Type> type)
    : name(node<Sym>(name)), type(type) {}
@@ -27,11 +33,22 @@ ensnare::EnumTypeDecl::EnumTypeDecl(const Str name, const Str cpp_name, const St
                                     const Vec<EnumFieldDecl> fields)
    : name(node<Sym>(name)), cpp_name(cpp_name), header(header), fields(fields) {}
 
-ensnare::RecordTypeDecl::RecordTypeDecl(const Str name, const Str cpp_name, const Str header)
-   : name(node<Sym>(name)), cpp_name(cpp_name), header(header) {}
+ensnare::RecordFieldDecl::RecordFieldDecl(const Str name, const Node<Type> type)
+   : name(node<Sym>(name)), type(type) {}
+
+ensnare::RecordTypeDecl::RecordTypeDecl(const Str name, const Str cpp_name, const Str header,
+                                        const Vec<RecordFieldDecl> fields)
+   : name(node<Sym>(name)), cpp_name(cpp_name), header(header), fields(fields) {}
 
 ensnare::ParamDecl::ParamDecl(const Str name, const Node<Type> type)
-   : name(node<Sym>(name)), type(type) {}
+   : _name(node<Sym>(name)), _type(type) {}
+
+ensnare::ParamDecl::ParamDecl(const Node<Sym> name, const Node<Type> type)
+   : _name(name), _type(type) {}
+
+fn ensnare::ParamDecl::name() const -> Node<Sym> { return _name; }
+
+fn ensnare::ParamDecl::type() const -> Node<Type> { return _type; }
 
 ensnare::FunctionDecl::FunctionDecl(const Str name, const Str cpp_name, const Str header,
                                     const Vec<ParamDecl> formals, const Opt<Node<Type>> return_type)

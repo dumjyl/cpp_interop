@@ -40,17 +40,16 @@ namespace ensnare {
 fn temp(Str name) -> Str { return os::temp_file("ensnare_system_includes_" + name); }
 
 // Get some verbose compiler logs to parse.
-fn get_raw_include_paths() -> Str {
+fn get_raw_include_paths(const Str& cmd_start) -> Str {
    os::write_file(temp("test"), ""); // so the compiler does not error.
    // FIXME: this is a pretty terrible check.
-   Str cmd = "clang++ -xc++ -c -v " + temp("test") + " 2>&1";
+   Str cmd = cmd_start + " -c -v " + temp("test") + " -o " + temp("test.o") + " 2>&1";
    return os::successful_process_output(cmd);
 }
-} // namespace ensnare
 
-fn ensnare::Header::search_paths() -> Vec<Str> {
+fn search_paths(const Str& cmd_start) -> Vec<Str> {
    Vec<Str> result;
-   auto lines = split_newlines(get_raw_include_paths());
+   auto lines = split_newlines(get_raw_include_paths(cmd_start));
    if (lines.size() == 0) {
       return result;
    }
@@ -65,6 +64,12 @@ fn ensnare::Header::search_paths() -> Vec<Str> {
       }
    }
    return result;
+}
+} // namespace ensnare
+
+fn ensnare::Header::search_paths() -> Vec<Str> {
+   // FIXME: expose the compiler/lang as an option.
+   return ensnare::search_paths("g++ -xc++");
 }
 
 fn ensnare::Header::render() const -> Str {

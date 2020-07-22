@@ -1,4 +1,4 @@
-#include "ensnare/private/rendering.hpp"
+#include "ensnare/private/render.hpp"
 
 #include "ensnare/private/str_utils.hpp"
 
@@ -11,6 +11,8 @@
 
 namespace ensnare {
 const std::size_t indent_size = 3;
+const Node<Sym> anon_name = node<Sym>("�", true);
+
 fn indent() -> Str {
    Str result;
    for (auto i = 0; i < indent_size; i += 1) {
@@ -40,26 +42,39 @@ const llvm::StringSet nim_keywords(
      "concept",  "static",    "type",     "using",  "const",    "let",       "var",     "for",
      "while",    "yield"});
 
-fn is_nim_keyword(const Str& str) -> bool { return nim_keywords.count(str) != 0; }
+fn is_nim_keyword(const Sym& sym) -> bool { return nim_keywords.count(sym.latest()) != 0; }
 
-fn needs_stropping(const Str& sym) { return is_nim_keyword(sym) || !is_ident_chars(sym); }
+fn needs_stropping(const Sym& sym) { return is_nim_keyword(sym) || !is_ident_chars(sym.latest()); }
 
-fn render(const Node<Sym>& sym) -> Str {
-   auto result = sym->latest();
-   if (needs_stropping(result)) {
-      return "`" + result + "`";
+fn render(const Node<Sym> sym) -> Str {
+   if (!sym->no_stropping() && needs_stropping(*sym)) {
+      return "`" + sym->latest() + "`";
    } else {
-      return result;
+      return sym->latest();
    }
 }
 
-fn render(const AtomType& typ) -> Str { return render(typ.name); }
+fn render(const AtomType& type) -> Str { return render(type.name); }
 
-fn render(const PtrType& typ) -> Str { return "ptr " + render(typ.pointee); }
+fn render(const PtrType& type) -> Str { return "ptr " + render(type.pointee); }
 
-fn render(const RefType& typ) -> Str { return "var " + render(typ.pointee); }
+fn render(const RefType& type) -> Str { return "var " + render(type.pointee); }
 
-fn render(const OpaqueType& typ) -> Str { return "object"; }
+fn render(const OpaqueType& type) -> Str { return "object"; }
+
+fn render(const InstType& type) -> Str {
+   Str result = render(type.name) + "[";
+   auto first = true;
+   for (const auto& type_param : type.types) {
+      if (!first) {
+         result += ", ";
+      }
+      result += render(type_param);
+      first = false;
+   }
+   result += "]";
+   return result;
+}
 
 fn render(const Node<Type>& type) -> Str {
    if (is<AtomType>(type)) {
@@ -70,6 +85,8 @@ fn render(const Node<Type>& type) -> Str {
       return render(deref<RefType>(type));
    } else if (is<OpaqueType>(type)) {
       return render(deref<OpaqueType>(type));
+   } else if (is<InstType>(type)) {
+      return render(deref<InstType>(type));
    } else {
       fatal("unreachable: render(Type)");
    }
@@ -99,7 +116,6 @@ fn render(const AliasTypeDecl& decl) -> Str {
 
 fn render(const EnumFieldDecl& decl) -> Str {
    if (decl.val) {
-
       return indent() + render(decl.name) + " = " + std::to_string(*decl.val) + '\n';
    } else {
       return indent() + render(decl.name) + '\n';
@@ -115,9 +131,17 @@ fn render(const EnumTypeDecl& decl) -> Str {
    return result;
 }
 
+fn render(const RecordFieldDecl& decl) -> Str {
+   return indent() + render(decl.name) + ": " + render(decl.type) + '\n';
+}
+
 fn render(const RecordTypeDecl& decl) -> Str {
-   return render(decl.name) + "* " +
-          render_pragmas({import_cpp(decl.cpp_name), header(decl.header)}) + " = object\n";
+   Str result = render(decl.name) + "* " +
+                render_pragmas({import_cpp(decl.cpp_name), header(decl.header)}) + " = object\n";
+   for (const auto& field : decl.fields) {
+      result += render(field);
+   }
+   return result;
 }
 
 fn render(const Node<TypeDecl>& decl) -> Str {
@@ -132,19 +156,36 @@ fn render(const Node<TypeDecl>& decl) -> Str {
    }
 }
 
-fn render(const ParamDecl& decl) -> Str { return render(decl.name) + ": " + render(decl.type); }
-
-fn render(const FunctionDecl& decl) -> Str {
-   auto result = "proc " + render(decl.name) + "*(";
-   auto first = true;
-   for (const auto& formal : decl.formals) {
-      if (not first) {
+fn render(const Vec<ParamDecl>& formals) -> Str {
+   Str result = "(";
+   for (auto i = 0; i < formals.size(); i += 1) {
+      if (i != 0) {
          result += ", ";
       }
-      result += render(formal);
-      first = false;
+      auto name = render(formals[i].name());
+      if (name == "") {
+         result += anon_name->latest() + std::to_string(i);
+      } else {
+         result += name;
+      }
+      result += ": " + render(formals[i].type());
    }
    result += ")";
+   return result;
+}
+
+fn render(ParamDecl first_formal, Vec<ParamDecl> formals) -> Str {
+   Vec<ParamDecl> tmp = {first_formal};
+   tmp.insert(tmp.end(), formals.begin(), formals.end());
+   return render(tmp);
+}
+
+fn self_param(const ConstructorDecl& decl) -> ParamDecl {
+   return ParamDecl(anon_name, node<Type>(InstType(node<Sym>("type", true), {decl.self})));
+}
+
+fn render(const FunctionDecl& decl) -> Str {
+   auto result = "proc " + render(decl.name) + "*" + render(decl.formals);
    if (decl.return_type) {
       result += ": ";
       result += render(*decl.return_type);
@@ -155,24 +196,15 @@ fn render(const FunctionDecl& decl) -> Str {
 }
 
 fn render(const ConstructorDecl& decl) -> Str {
-   Str result = "proc `{}`*(Self: type[";
-   result += render(decl.self) + "]";
-   for (const auto& formal : decl.formals) {
-      result += ", " + render(formal);
-   }
-   result += "): " + render(decl.self);
-   result += "\n" + indent() +
-             render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
+   Str result = "proc `{}`*" + render(self_param(decl), decl.formals) + ": " + render(decl.self) +
+                "\n" + indent() +
+                render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
    return result;
 }
 
 fn render(const MethodDecl& decl) -> Str {
-   Str result = "proc " + render(decl.name) + "*(self: ";
-   result += render(decl.self);
-   for (const auto& formal : decl.formals) {
-      result += ", " + render(formal);
-   }
-   result += ")";
+   Str result =
+       "proc " + render(decl.name) + "*" + render(ParamDecl(anon_name, decl.self), decl.formals);
    if (decl.return_type) {
       result += ": ";
       result += render(*decl.return_type);

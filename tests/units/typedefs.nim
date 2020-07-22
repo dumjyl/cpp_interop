@@ -1,4 +1,5 @@
 import ensnare/runtime
+export runtime
 
 # --- types
 

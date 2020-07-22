@@ -1,4 +1,5 @@
 import ensnare/runtime
+export runtime
 
 # --- types
 
@@ -14,15 +15,17 @@ type
    `TypedefTest-TypedefNamedAnon`* {.import_cpp: "TypedefTest::TypedefNamedAnon", header: "abc.hpp".} = object
    `type_of(XYZ-xyz_field)`* {.import_cpp: "decltype(XYZ::xyz_field)", header: "abc.hpp".} = object
    XYZ* {.import_cpp: "XYZ", header: "abc.hpp".} = object
-      xyz_field: `type_of(XYZ-xyz_field`)
+      xyz_field: `type_of(XYZ-xyz_field)`
    `type_of(anon_union_var)`* {.import_cpp: "decltype(anon_union_var)", header: "abc.hpp".} = object
 
 # --- routines
 
-proc `{}`*(Self: type[`blah-Foo`], a: CppInt, b: CppInt): `blah-Foo`
+proc `{}`*(�: type[`blah-Foo`], a: CppInt, b: CppInt): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
-proc calc*(self: `blah-Foo`, x: CppInt): CppInt
+proc calc*(�: `blah-Foo`, x: CppInt): CppInt
    {.import_cpp: "blah::Foo::calc(@)", header: "abc.hpp".}
+proc `{}`*(�: type[`blah-Foo`], �1: var `blah-Foo`): `blah-Foo`
+   {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
 
 # --- variables
 

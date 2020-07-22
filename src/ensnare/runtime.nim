@@ -1,9 +1,6 @@
 # c++ standard: https://timsong-cpp.github.io/cppwp/n4861/
 #               this is c++20ish, but we target c++17
 
-{.pass_c: "-std=c++17".}
-
-from std/os import is_absolute, split_file, `/`
 import private/macro_utils
 
 const hpp = "ensnare/private/runtime.hpp"
@@ -157,7 +154,20 @@ macro cpp_link_lib*(libraries: static[openarray[string]]) =
       result.add(!`bind cpp_link_lib`(`library.lit`))
 
 template cpp_compile_src*(src: static[string]) =
+   # FIXME(nim): throws IOError instead of error when file does not exist.
    {.compile: src.}
 
 template emit_cpp*(src: static[string]) =
    {.emit: src.}
+
+cpp_forward_compiler("-std=c++17")
+
+when defined(address_sanitizer):
+   cpp_forward_compiler("-fsanitize=address -fno-omit-frame-pointer")
+   cpp_forward_linker("-fsanitize=address")
+
+when defined(undefined_sanitizer):
+   cpp_forward_compiler("-fsanitize=undefined")
+
+when defined(memory_sanitizer):
+   cpp_forward_compiler("-fsanitize=memory")

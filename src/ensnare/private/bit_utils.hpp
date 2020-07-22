@@ -45,12 +45,20 @@ template <typename T> using IsBitEncodable = std::enable_if_t<(type_size<T>() < 
 
 /// A simple bit set class.
 template <typename T, typename = detail::IsBitEncodable<T>> class BitSet {
-   priv char detail[detail::type_size<T>() / 8];
+   priv static constexpr fn array_size() -> std::size_t { return detail::type_size<T>() / 8; }
+
+   priv char detail[array_size()];
+
+   pub BitSet() {
+      for (auto i = 0; i < array_size(); i += 1) {
+         detail[i] = char(0);
+      }
+   }
 
    /// Include a value in the bitset.
    pub fn incl(T val) {
       auto i = detail::encode(val);
-      detail[i / 8] = detail[i / 8] | (1 << (i % 8));
+      detail[i / 8] |= (1 << (i % 8));
    }
 
    fn get(std::size_t i) const -> bool { return (detail[i / 8] & (1 << (i % 8))) != 0; }
@@ -69,6 +77,7 @@ template <typename T, typename = detail::IsBitEncodable<T>> class BitSet {
          }
       }
       result += "]";
+      return result;
    }
 };
 
