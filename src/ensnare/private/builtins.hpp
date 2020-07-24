@@ -6,7 +6,7 @@
 /// complicated types.
 namespace ensnare::builtins {
 /// Initalize a builtin type.
-Node<Type> init(const char* name) { return node<Type>(AtomType(name)); }
+Node<Type> init(const char* name) { return node<Type>(node<Sym>(name)); }
 
 /// An atomic Type.
 using Builtin = const Node<Type>;
@@ -21,10 +21,10 @@ Builtin _ushort = init("CppUShort");        ///< Represents `unsigned short`.
 Builtin _uint = init("CppUInt");            ///< Represents `unsigned int`.
 Builtin _ulong = init("CppULong");          ///< Represents `unsigned long`.
 Builtin _ulong_long = init("CppULongLong"); ///< Represents `unsigned long long`.
-Builtin _char = init("CppChar");   ///< Represents `char`. Nim passes `funsigned-char` so this will
-                                   ///< always be unsigned for us.
-Builtin _wchar = init("CppWChar"); ///< Represents `whcar_t`.
-Builtin _char8 = init("CppChar8"); ///< Represents `char8_t`.
+/// Represents `char`. Nim passes `funsigned-char` so this will always be unsigned for us.
+Builtin _char = init("CppChar");
+Builtin _wchar = init("CppWChar");              ///< Represents `whcar_t`.
+Builtin _char8 = init("CppChar8");              ///< Represents `char8_t`.
 Builtin _char16 = init("CppChar16");            ///< Represents `char16_t`.
 Builtin _char32 = init("CppChar32");            ///< Represents `char32_t`.
 Builtin _bool = init("CppBool");                ///< Represents `bool`.

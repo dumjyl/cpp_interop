@@ -69,7 +69,7 @@ fn search_paths(const Str& cmd_start) -> Vec<Str> {
 
 fn ensnare::Header::search_paths() -> Vec<Str> {
    // FIXME: expose the compiler/lang as an option.
-   return ensnare::search_paths("g++ -xc++");
+   return ensnare::search_paths("clang++ -xc++");
 }
 
 fn ensnare::Header::render() const -> Str {

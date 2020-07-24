@@ -6,6 +6,6 @@ typedef struct TypedefNameAlias {
 
 typedef struct {
 } TypedefAnonName;
-//
+
 // typedef struct {
 //};

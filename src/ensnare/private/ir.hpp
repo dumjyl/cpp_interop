@@ -18,37 +18,33 @@ namespace ensnare {
 class Sym {
    priv Vec<Str> detail;
    priv bool _no_stropping; ///< This symbol does not require stropping even if it is a keyword.
-   pub Sym(const Str& name, bool no_stropping = false);
+   pub Sym(Str name, bool no_stropping = false);
    pub fn latest() const -> Str;
    pub fn no_stropping() const -> bool;
 };
 
-class AtomType;
 class PtrType;
 class RefType;
 class OpaqueType;
 class InstType;
+class UnsizedArrayType;
+class ArrayType;
+class FuncType;
 
 /// Some kind of type. Should be stored within a Node.
-using Type = Union<AtomType, PtrType, RefType, OpaqueType, InstType>;
-
-/// An identifier.
-class AtomType {
-   pub const Node<Sym> name;
-   pub AtomType(const Str name);
-   pub AtomType(const Node<Sym> name);
-};
+using Type =
+    Union<Node<Sym>, PtrType, RefType, OpaqueType, InstType, UnsizedArrayType, ArrayType, FuncType>;
 
 /// Just a raw pointer.
 class PtrType {
    pub const Node<Type> pointee;
-   pub PtrType(const Node<Type> pointee);
+   pub PtrType(Node<Type> pointee);
 };
 
 /// A c++ reference pointer.
 class RefType {
    pub const Node<Type> pointee;
-   pub RefType(const Node<Type> pointee);
+   pub RefType(Node<Type> pointee);
 };
 
 class OpaqueType {};
@@ -56,7 +52,24 @@ class OpaqueType {};
 class InstType {
    pub const Node<Sym> name;
    pub const Vec<Node<Type>> types;
-   pub InstType(const Node<Sym> name, const Vec<Node<Type>> types);
+   pub InstType(Node<Sym> name, Vec<Node<Type>> types);
+};
+
+class UnsizedArrayType {
+   pub const Node<Type> type;
+   pub UnsizedArrayType(Node<Type> type);
+};
+
+class ArrayType {
+   pub const std::uint64_t size;
+   pub const Node<Type> type;
+   pub ArrayType(std::uint64_t size, Node<Type> type);
+};
+
+class FuncType {
+   pub const Vec<Node<Type>> formals;
+   pub const Node<Type> return_type;
+   pub FuncType(Vec<Node<Type>> formals, Node<Type> return_type);
 };
 
 /// A `type Foo = Bar[X, Y]` like declaration.
@@ -64,15 +77,16 @@ class InstType {
 class AliasTypeDecl {
    pub const Node<Sym> name;
    pub const Node<Type> type;
-   pub AliasTypeDecl(const Str name, const Node<Type> type);
+   pub AliasTypeDecl(Str name, Node<Type> type);
+   pub AliasTypeDecl(Node<Sym> name, Node<Type> type);
 };
 
 /// An enum field declation.
 class EnumFieldDecl {
    pub const Node<Sym> name;
    pub const Opt<std::int64_t> val;
-   pub EnumFieldDecl(const Str name);
-   pub EnumFieldDecl(const Str name, std::int64_t val);
+   pub EnumFieldDecl(Str name);
+   pub EnumFieldDecl(Str name, std::int64_t val);
 };
 
 /// A c++ enum of some kind. It may not be mapped as a nim enum.
@@ -81,14 +95,13 @@ class EnumTypeDecl {
    pub const Str cpp_name;
    pub const Str header;
    pub const Vec<EnumFieldDecl> fields;
-   pub EnumTypeDecl(const Str name, const Str cpp_name, const Str header,
-                    const Vec<EnumFieldDecl> fields);
+   pub EnumTypeDecl(Str name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields);
 };
 
 class RecordFieldDecl {
    pub const Node<Sym> name;
    pub const Node<Type> type;
-   pub RecordFieldDecl(const Str name, const Node<Type> type);
+   pub RecordFieldDecl(Str name, Node<Type> type);
 };
 
 /// A `struct` / `class` / `union` type declaration.
@@ -97,8 +110,8 @@ class RecordTypeDecl {
    pub const Str cpp_name;
    pub const Str header;
    pub const Vec<RecordFieldDecl> fields;
-   pub RecordTypeDecl(const Str name, const Str cpp_name, const Str header,
-                      const Vec<RecordFieldDecl> fields);
+   pub RecordTypeDecl(Str name, Str cpp_name, Str header, Vec<RecordFieldDecl> fields);
+   pub RecordTypeDecl(Node<Sym> name, Str cpp_name, Str header, Vec<RecordFieldDecl> fields);
 };
 
 /// Some kind of type declaration. Should be stored within a Node.
@@ -110,8 +123,8 @@ class ParamDecl {
    priv Node<Type> _type;
    pub fn name() const -> Node<Sym>;
    pub fn type() const -> Node<Type>;
-   pub ParamDecl(const Str name, const Node<Type> type);
-   pub ParamDecl(const Node<Sym> name, const Node<Type> type);
+   pub ParamDecl(Str name, Node<Type> type);
+   pub ParamDecl(Node<Sym> name, Node<Type> type);
 };
 
 /// A non method function declaration.
@@ -121,8 +134,8 @@ class FunctionDecl {
    pub const Str header;
    pub const Vec<ParamDecl> formals;
    pub const Opt<Node<Type>> return_type;
-   pub FunctionDecl(const Str name, const Str cpp_name, const Str header,
-                    const Vec<ParamDecl> formals, const Opt<Node<Type>> return_type);
+   pub FunctionDecl(Str name, Str cpp_name, Str header, Vec<ParamDecl> formals,
+                    Opt<Node<Type>> return_type);
 };
 
 /// A c++ class/struct/union constructor.
@@ -131,8 +144,7 @@ class ConstructorDecl {
    pub const Str header;
    pub const Node<Type> self;
    pub const Vec<ParamDecl> formals;
-   pub ConstructorDecl(const Str cpp_name, const Str header, const Node<Type> self,
-                       const Vec<ParamDecl> formals);
+   pub ConstructorDecl(Str cpp_name, Str header, Node<Type> self, Vec<ParamDecl> formals);
 };
 
 /// A c++ class/struct/union method.
@@ -143,8 +155,8 @@ class MethodDecl {
    pub const Node<Type> self;
    pub const Vec<ParamDecl> formals;
    pub const Opt<Node<Type>> return_type;
-   pub MethodDecl(const Str name, const Str cpp_name, const Str header, const Node<Type> self,
-                  const Vec<ParamDecl> formals, const Opt<Node<Type>> return_type);
+   pub MethodDecl(Str name, Str cpp_name, Str header, Node<Type> self, Vec<ParamDecl> formals,
+                  Opt<Node<Type>> return_type);
 };
 
 /// Some kind of routine declaration. Should be stored within a Node.
@@ -156,7 +168,7 @@ class VariableDecl {
    pub const Str cpp_name;
    pub const Str header;
    pub const Node<Type> type;
-   pub VariableDecl(const Str name, const Str cpp_name, const Str header, const Node<Type> type);
+   pub VariableDecl(Str name, Str cpp_name, Str header, Node<Type> type);
 };
 } // namespace ensnare
 

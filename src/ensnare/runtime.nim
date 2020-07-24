@@ -168,6 +168,8 @@ when defined(address_sanitizer):
 
 when defined(undefined_sanitizer):
    cpp_forward_compiler("-fsanitize=undefined")
+   cpp_forward_linker("-fsanitize=undefined")
 
-when defined(memory_sanitizer):
-   cpp_forward_compiler("-fsanitize=memory")
+# when defined(memory_sanitizer):
+#    cpp_forward_compiler("-fsanitize=memory")
+#    cpp_forward_linker("-fsanitize=memory")

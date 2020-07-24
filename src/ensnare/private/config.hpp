@@ -16,6 +16,7 @@ class Config {
    priv Vec<Header> _headers;
    priv Str _output;
    priv Vec<Str> _user_clang_args;
+   priv Vec<Str> _recurse_dirs;
    priv Vec<Str> _syms;
    priv bool _disable_includes;
 
@@ -28,6 +29,8 @@ class Config {
    /// The user's arguments that will be passed to clang.
    /// These are the postional arguments that are not the output location or a header.
    pub fn user_clang_args() const -> const Vec<Str>&;
+   /// Declarations that live in a header in one of these directories can be wrapped.
+   pub fn recurse_dirs() const -> const Vec<Str>&;
    /// Specifies specific symbols to bind instead of trying to be smart.
    pub fn syms() const -> const Vec<Str>&;
    /// If we should try to find some reasonable include search paths from a compiler.

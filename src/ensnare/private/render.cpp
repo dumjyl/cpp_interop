@@ -32,29 +32,50 @@ fn indent(const Str& str) -> Str {
 fn render(const Node<Type>& type) -> Str;
 
 const llvm::StringSet nim_keywords(
-    {"nil",      "addr",      "asm",      "bind",   "mixin",    "block",     "break",   "do",
-     "continue", "defer",     "discard",  "cast",   "if",       "when",      "case",    "of",
-     "elif",     "else",      "end",      "except", "import",   "export",    "include", "from",
-     "as",       "is",        "isnot",    "div",    "mod",      "in",        "notin",   "not",
-     "and",      "or",        "xor",      "shl",    "shr",      "out",       "proc",    "func",
-     "method",   "converter", "template", "macro",  "iterator", "interface", "raise",   "return",
-     "finally",  "try",       "tuple",    "object", "enum",     "ptr",       "ref",     "distinct",
-     "concept",  "static",    "type",     "using",  "const",    "let",       "var",     "for",
-     "while",    "yield"});
-
-fn is_nim_keyword(const Sym& sym) -> bool { return nim_keywords.count(sym.latest()) != 0; }
-
-fn needs_stropping(const Sym& sym) { return is_nim_keyword(sym) || !is_ident_chars(sym.latest()); }
+    {"nil",      "addr",     "asm",       "bind",     "mixin",  "block",    "do",        "break",
+     "yield",    "continue", "defer",     "discard",  "cast",   "if",       "when",      "case",
+     "of",       "elif",     "else",      "end",      "except", "import",   "export",    "include",
+     "from",     "as",       "is",        "isnot",    "div",    "mod",      "in",        "notin",
+     "not",      "and",      "or",        "xor",      "shl",    "shr",      "out",       "proc",
+     "func",     "method",   "converter", "template", "macro",  "iterator", "interface", "raise",
+     "return",   "finally",  "try",       "tuple",    "object", "enum",     "ptr",       "ref",
+     "distinct", "concept",  "static",    "type",     "using",  "const",    "let",       "var",
+     "for",      "while"});
 
 fn render(const Node<Sym> sym) -> Str {
-   if (!sym->no_stropping() && needs_stropping(*sym)) {
-      return "`" + sym->latest() + "`";
+   auto latest = sym->latest();
+   auto is_keyword = nim_keywords.count(latest) != 0;
+   auto non_ident_char = !is_ident_chars(latest);
+   auto underscore_count = 0;
+   auto seen_char = false;
+   Str result;
+   for (auto i = 0; i < latest.size(); i += 1) {
+      auto c = latest[i];
+      if (c == '_') {
+         underscore_count += 1;
+      } else {
+         if (underscore_count == 1 && seen_char) {
+            result += '_';
+         } else {
+            for (auto j = 0; j < underscore_count; j += 1) {
+               result += "�";
+            }
+         }
+         underscore_count = 0;
+         seen_char = true;
+         result += c;
+      }
+   }
+   for (auto j = 0; j < underscore_count; j += 1) {
+      result += "�";
+   }
+   if (!sym->no_stropping() && (non_ident_char || is_keyword)) {
+
+      return "`" + result + "`";
    } else {
-      return sym->latest();
+      return result;
    }
 }
-
-fn render(const AtomType& type) -> Str { return render(type.name); }
 
 fn render(const PtrType& type) -> Str { return "ptr " + render(type.pointee); }
 
@@ -76,9 +97,30 @@ fn render(const InstType& type) -> Str {
    return result;
 }
 
+fn render(const UnsizedArrayType& type) -> Str {
+   return "CppUnsizedArray[" + render(type.type) + "]";
+}
+
+fn render(const ArrayType& type) -> Str {
+   return "array[" + std::to_string(type.size) + ", " + render(type.type) + "]";
+}
+
+fn render(const FuncType& type) -> Str {
+   Str result = "proc (";
+   for (auto i = 0; i < type.formals.size(); i += 1) {
+      if (i != 0) {
+         result += ", ";
+      }
+      result += anon_name->latest() + std::to_string(i);
+      result += ": " + render(type.formals[i]);
+   }
+   result += "): " + render(type.return_type);
+   return result;
+}
+
 fn render(const Node<Type>& type) -> Str {
-   if (is<AtomType>(type)) {
-      return render(deref<AtomType>(type));
+   if (is<Node<Sym>>(type)) {
+      return render(deref<Node<Sym>>(type));
    } else if (is<PtrType>(type)) {
       return render(deref<PtrType>(type));
    } else if (is<RefType>(type)) {
@@ -87,6 +129,12 @@ fn render(const Node<Type>& type) -> Str {
       return render(deref<OpaqueType>(type));
    } else if (is<InstType>(type)) {
       return render(deref<InstType>(type));
+   } else if (is<UnsizedArrayType>(type)) {
+      return render(deref<UnsizedArrayType>(type));
+   } else if (is<ArrayType>(type)) {
+      return render(deref<ArrayType>(type));
+   } else if (is<FuncType>(type)) {
+      return render(deref<FuncType>(type));
    } else {
       fatal("unreachable: render(Type)");
    }
@@ -236,8 +284,7 @@ fn render(const Vec<Node<TypeDecl>>& decls) -> Str {
    if (decls.size() == 0) {
       return "";
    } else {
-      Str result = "\n# --- types\n\n";
-      result += "type\n";
+      Str result = "\ntype\n";
       for (const auto& decl : decls) {
          result += indent(render(decl));
       }
@@ -249,7 +296,7 @@ fn render(const Vec<Node<RoutineDecl>>& decls) -> Str {
    if (decls.size() == 0) {
       return "";
    } else {
-      Str result = "\n# --- routines\n\n";
+      Str result = "\n";
       for (const auto& decl : decls) {
          result += render(decl);
       }
@@ -261,8 +308,7 @@ fn render(const Vec<Node<VariableDecl>>& decls) -> Str {
    if (decls.size() == 0) {
       return "";
    } else {
-      Str result = "\n# --- variables\n\n";
-      result += "var\n";
+      Str result = "\nvar\n";
       for (const auto& decl : decls) {
          result += indent(render(decl));
       }

@@ -15,22 +15,26 @@
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/raw_ostream.h"
 
+// FIXME: move to os utils.
+#ifdef __ARM_ARCH_ISA_A64
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#elif
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
+
 //
 #include "ensnare/private/syn.hpp"
 
 namespace ensnare {
-
 /// Render an access specifier as a string. For debugging.
 fn render(clang::AccessSpecifier as) -> Str {
    switch (as) {
-      case clang::AS_none:
-         return "AS_none";
-      case clang::AS_public:
-         return "AS_public";
-      case clang::AS_private:
-         return "AS_private";
-      case clang::AS_protected:
-         return "AS_protected";
+      case clang::AS_none: return "AS_none";
+      case clang::AS_public: return "AS_public";
+      case clang::AS_private: return "AS_private";
+      case clang::AS_protected: return "AS_protected";
    }
 }
 
@@ -81,12 +85,21 @@ class Context {
    pub fn inc_map_mode() { map_wrap_counter += 1; }
    pub fn dec_map_mode() { map_wrap_counter -= 1; }
 
-   pub fn decl() const -> const clang::NamedDecl& { return *decl_stack[decl_stack.size() - 2]; }
+   pub fn decl(int i) const -> const clang::NamedDecl& {
+      if (i < decl_stack.size()) {
+         return *decl_stack[decl_stack.size() - i - 1];
+      } else {
+         for (auto decl : decl_stack) {
+            print(render(decl));
+         }
+         fatal("unreachable: failed to get decl context");
+      }
+   }
    pub fn push(const clang::NamedDecl& decl) { decl_stack.push_back(&decl); }
    pub fn pop_decl() { decl_stack.pop_back(); }
 
    /// Get the filename from a source location.
-   pub fn filename(const clang::SourceLocation& loc) const -> llvm::StringRef {
+   pub fn filename(const clang::SourceLocation& loc) const -> Str {
       return ast_ctx.getSourceManager().getFilename(loc);
    }
 
@@ -104,6 +117,7 @@ class Context {
    pub fn associate(const clang::Decl& decl, const Node<Type> type) {
       auto maybe_type = lookup(decl);
       if (maybe_type) {
+         print(render(decl));
          fatal("unreachable: duplicate type in lookup");
       } else {
          type_lookup[&decl] = type;
@@ -131,7 +145,26 @@ class Context {
             return header;
          }
       }
+      for (const auto& dir : cfg.recurse_dirs()) {
+         for (const auto& entry : fs::recursive_directory_iterator(dir)) {
+            if (fs::is_regular_file(entry) &&
+                filename(decl.getLocation()) == Str(fs::path(entry))) {
+               Str path = fs::path(entry);
+               return path.substr(dir.size() + 1);
+            }
+         }
+      }
       return {};
+   }
+
+   pub fn dumb_header(const clang::NamedDecl& decl) const -> Str {
+      auto maybe_header = header(decl);
+      if (maybe_header) {
+         return *maybe_header;
+      } else {
+         print(render(decl));
+         fatal("failed to canonicalize source location");
+      }
    }
 };
 
@@ -268,61 +301,37 @@ fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
          fatal("unhandled builtin type: ",
                entity.getNameAsCString(clang::PrintingPolicy(clang::LangOptions())));
       }
-      case clang::BuiltinType::Kind::SChar:
-         return builtins::_schar;
-      case clang::BuiltinType::Kind::Short:
-         return builtins::_short;
-      case clang::BuiltinType::Kind::Int:
-         return builtins::_int;
-      case clang::BuiltinType::Kind::Long:
-         return builtins::_long;
-      case clang::BuiltinType::Kind::LongLong:
-         return builtins::_long_long;
-      case clang::BuiltinType::Kind::UChar:
-         return builtins::_char;
-      case clang::BuiltinType::Kind::UShort:
-         return builtins::_ushort;
-      case clang::BuiltinType::Kind::UInt:
-         return builtins::_uint;
-      case clang::BuiltinType::Kind::ULong:
-         return builtins::_ulong;
-      case clang::BuiltinType::Kind::ULongLong:
-         return builtins::_ulong_long;
-      case clang::BuiltinType::Kind::Char_U:
-         return builtins::_char;
+      case clang::BuiltinType::Kind::SChar: return builtins::_schar;
+      case clang::BuiltinType::Kind::Short: return builtins::_short;
+      case clang::BuiltinType::Kind::Int: return builtins::_int;
+      case clang::BuiltinType::Kind::Long: return builtins::_long;
+      case clang::BuiltinType::Kind::LongLong: return builtins::_long_long;
+      case clang::BuiltinType::Kind::UChar: return builtins::_char;
+      case clang::BuiltinType::Kind::UShort: return builtins::_ushort;
+      case clang::BuiltinType::Kind::UInt: return builtins::_uint;
+      case clang::BuiltinType::Kind::ULong: return builtins::_ulong;
+      case clang::BuiltinType::Kind::ULongLong: return builtins::_ulong_long;
+      case clang::BuiltinType::Kind::Char_U: return builtins::_char;
       case clang::BuiltinType::Kind::WChar_U: // 'wchar_t' for targets where it's unsigned
       case clang::BuiltinType::Kind::WChar_S: // 'wchar_t' for targets where it's signed
                                               // FIXME: do we care about the difference?
          return builtins::_wchar;
-      case clang::BuiltinType::Kind::Char8:
-         return builtins::_char8;
-      case clang::BuiltinType::Kind::Char16:
-         return builtins::_char16;
-      case clang::BuiltinType::Kind::Char32:
-         return builtins::_char32;
-      case clang::BuiltinType::Kind::Bool:
-         return builtins::_bool;
-      case clang::BuiltinType::Kind::Float:
-         return builtins::_float;
-      case clang::BuiltinType::Kind::Double:
-         return builtins::_double;
-      case clang::BuiltinType::Kind::LongDouble:
-         return builtins::_long_double;
-      case clang::BuiltinType::Kind::Void:
-         return builtins::_void;
-      case clang::BuiltinType::Kind::Int128:
-         return builtins::_int128;
-      case clang::BuiltinType::Kind::UInt128:
-         return builtins::_uint128;
+      case clang::BuiltinType::Kind::Char8: return builtins::_char8;
+      case clang::BuiltinType::Kind::Char16: return builtins::_char16;
+      case clang::BuiltinType::Kind::Char32: return builtins::_char32;
+      case clang::BuiltinType::Kind::Bool: return builtins::_bool;
+      case clang::BuiltinType::Kind::Float: return builtins::_float;
+      case clang::BuiltinType::Kind::Double: return builtins::_double;
+      case clang::BuiltinType::Kind::LongDouble: return builtins::_long_double;
+      case clang::BuiltinType::Kind::Void: return builtins::_void;
+      case clang::BuiltinType::Kind::Int128: return builtins::_int128;
+      case clang::BuiltinType::Kind::UInt128: return builtins::_uint128;
       case clang::BuiltinType::Kind::Half:
          // FIXME: return ctx.builtins._ocl_float16;
          return builtins::_neon_float16;
-      case clang::BuiltinType::Kind::Float16:
-         return builtins::_float16;
-      case clang::BuiltinType::Kind::Float128:
-         return builtins::_float128;
-      case clang::BuiltinType::Kind::NullPtr:
-         return builtins::_nullptr;
+      case clang::BuiltinType::Kind::Float16: return builtins::_float16;
+      case clang::BuiltinType::Kind::Float128: return builtins::_float128;
+      case clang::BuiltinType::Kind::NullPtr: return builtins::_nullptr;
       default:
          entity.dump();
          fatal("unreachable: builtin type: ",
@@ -331,11 +340,12 @@ fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
 } // namespace ensnare::ct
 
 /// Map a const/volatile/__restrict qualified type.
+
 fn map(Context& ctx, const clang::QualType& entity) -> Node<Type> {
    // Too niche to care about for now.
-   if (entity.isRestrictQualified() || entity.isVolatileQualified()) {
-      fatal("volatile and restrict qualifiers unsupported");
-   }
+   // if (entity.isRestrictQualified() || entity.isVolatileQualified()) {
+   //   fatal("volatile and restrict qualifiers unsupported");
+   //}
    auto type = entity.getTypePtr();
    if (type) {
       auto result = map(ctx, *type);
@@ -350,26 +360,6 @@ fn map(Context& ctx, const clang::QualType& entity) -> Node<Type> {
    }
 }
 
-/// Map a Node<TypeDecl>. These get stored on the right hand side of Context::type_lookup.
-/// See Context::associate for more information.
-fn map(Context& ctx, const Node<TypeDecl>& entity) -> Node<Type> {
-   if (is<AliasTypeDecl>(entity)) {
-      return node<Type>(AtomType(deref<AliasTypeDecl>(entity).name));
-   } else if (is<EnumTypeDecl>(entity)) {
-      return node<Type>(AtomType(deref<EnumTypeDecl>(entity).name));
-   } else if (is<RecordTypeDecl>(entity)) {
-      return node<Type>(AtomType(deref<RecordTypeDecl>(entity).name));
-   } else {
-      fatal("unreachable: TypeDecl");
-   }
-}
-
-/// Map an elaborated type. An elaborated type is a syntactical node to not lose information in the
-/// clang AST. We care about semantics so we can ignore this.
-fn map(Context& ctx, const clang::ElaboratedType& entity) -> Node<Type> {
-   return map(ctx, entity.getNamedType());
-}
-
 /// tldr: map_wrap enforces wrapping types decls that we need while wrapping as little as possible.
 ///
 /// Problem:
@@ -378,13 +368,16 @@ fn map(Context& ctx, const clang::ElaboratedType& entity) -> Node<Type> {
 /// But we need to produce a type declaration for it regardless, to not render our wrapper useless
 /// with an undeclared identifier error. We can't simply call wrap, as that would fail for
 /// the same reasons we hadn't wrapped it yet already.
+///
 /// Solution:
 /// map_wrap is our way of enforcing wrapping when we need to reference a type.
-/// When we encouter a type like `SomeClass` we inc/dec a recursion counter and call wrap.
-/// wrap shall check this at strategic points to enforce wrapping.
+/// When we encouter a type like `SomeClass` we increment a counter and call wrap and decrement when
+/// we return. wrap shall check this counter at strategic points to enforce wrapping.
+///
 /// New Problem:
 /// When we wrap a declaration we also wrap any associated behavior and data. Those decls may
 /// reference more types like `SomeClass`. We end up binding a whole lot more than the user wanted.
+///
 /// Solution: map_wrap mode also prevents binding associated declarations.
 ///
 /// FIXME: consider if it is cleaner to have map_wrap a separate set of functions sharing helpers.
@@ -412,61 +405,59 @@ fn map(Context& ctx, const clang::NamedDecl& decl) -> Node<Type> {
    }
 }
 
-fn map(Context& ctx, const clang::TypedefType& type) -> Node<Type> {
-   return map(ctx, type.getDecl());
-}
+using TypeStack = Vec<std::reference_wrapper<const clang::Type>>;
 
-fn map(Context& ctx, const clang::RecordType& type) -> Node<Type> { return map(ctx, type.getDecl()); }
-
-fn map(Context& ctx, const clang::EnumType& type) -> Node<Type> { return map(ctx, type.getDecl()); }
-
-fn map(Context& ctx, const clang::PointerType& type) -> Node<Type> {
-   return node<Type>(PtrType(map(ctx, type.getPointeeType())));
-}
-
-fn map(Context& ctx, const clang::ReferenceType& type) -> Node<Type> {
-   return node<Type>(RefType(map(ctx, type.getPointeeType())));
-}
-
-fn map(Context& ctx, const clang::VectorType& type) -> Node<Type> {
-   // The hope is that this is an aliased type as part of `typedef` / `using`
-   // and the internals don't matter.
-   return node<Type>(OpaqueType());
-}
-
-fn map(Context& ctx, const clang::ParenType& type) -> Node<Type> {
-   return map(ctx, type.getInnerType());
-}
-
-fn map(Context& ctx, const clang::DecltypeType& type) -> Node<Type> {
-   return map(ctx, type.getUnderlyingType());
-}
-
-#define DISPATCH(kind)                                                                             \
-   case clang::Type::TypeClass::kind: {                                                            \
-      return map(ctx, llvm::cast<clang::kind##Type>(entity));                                      \
+fn map(Context& ctx, const clang::Type& type) -> Node<Type> {
+   switch (type.getTypeClass()) {
+      case clang::Type::TypeClass::Elaborated: {
+         // Map an elaborated type. An elaborated type is a syntactic node to not lose information
+         // in the clang AST. We care about semantics so we can ignore this.
+         return map(ctx, llvm::cast<clang::ElaboratedType>(type).getNamedType());
+      }
+      case clang::Type::TypeClass::Typedef:
+         return map(ctx, llvm::cast<clang::TypedefType>(type).getDecl());
+      case clang::Type::TypeClass::Record:
+         return map(ctx, llvm::cast<clang::RecordType>(type).getDecl());
+      case clang::Type::TypeClass::Enum:
+         return map(ctx, llvm::cast<clang::EnumType>(type).getDecl());
+      case clang::Type::TypeClass::Pointer:
+         return node<Type>(
+             PtrType(map(ctx, llvm::cast<clang::PointerType>(type).getPointeeType())));
+      case clang::Type::TypeClass::LValueReference:
+      case clang::Type::TypeClass::RValueReference:
+         return node<Type>(
+             RefType(map(ctx, llvm::cast<clang::ReferenceType>(type).getPointeeType())));
+      case clang::Type::TypeClass::Vector:
+         // The hope is that this is an aliased type as part of `typedef` / `using`
+         // and the internals don't matter.
+         return node<Type>(OpaqueType());
+      case clang::Type::TypeClass::ConstantArray: {
+         const auto& ty = llvm::cast<clang::ConstantArrayType>(type);
+         return node<Type>(
+             ArrayType(ty.getSize().getLimitedValue(), map(ctx, ty.getElementType())));
+      }
+      case clang::Type::TypeClass::IncompleteArray:
+         return node<Type>(UnsizedArrayType(
+             map(ctx, llvm::cast<clang::IncompleteArrayType>(type).getElementType())));
+      case clang::Type::TypeClass::FunctionProto: {
+         const auto& ty = llvm::cast<clang::FunctionProtoType>(type);
+         Vec<Node<Type>> types;
+         for (auto param_type : ty.param_types()) {
+            types.push_back(map(ctx, param_type));
+         }
+         return node<Type>(FuncType(types, map(ctx, ty.getReturnType())));
+      }
+      case clang::Type::TypeClass::Decltype:
+         return map(ctx, llvm::cast<clang::DecltypeType>(type).getUnderlyingType());
+      case clang::Type::TypeClass::Paren:
+         return map(ctx, llvm::cast<clang::ParenType>(type).getInnerType());
+      case clang::Type::TypeClass::Builtin: return map(ctx, llvm::cast<clang::BuiltinType>(type));
+      default: {
+         type.dump();
+         fatal("unhandled mapping: ", type.getTypeClassName());
+      }
    }
-
-fn map(Context& ctx, const clang::Type& entity) -> Node<Type> {
-   switch (entity.getTypeClass()) {
-      DISPATCH(Builtin);
-      DISPATCH(Elaborated);
-      DISPATCH(Record);
-      DISPATCH(Enum);
-      DISPATCH(Pointer);
-      DISPATCH(LValueReference);
-      DISPATCH(RValueReference);
-      DISPATCH(Typedef);
-      DISPATCH(Vector);
-      DISPATCH(Paren);
-      DISPATCH(Decltype);
-      default:
-         entity.dump();
-         fatal("unhandled mapping: ", entity.getTypeClassName());
-   }
-}
-
-#undef DISPATCH
+} // namespace ensnare
 
 /// Is this declaration declared without an identifier.
 fn has_name(const clang::NamedDecl& decl) -> bool { return decl.getIdentifier(); }
@@ -494,22 +485,19 @@ fn transfer_return_type(Context& ctx, const clang::FunctionDecl& decl) -> Opt<No
 }
 
 fn wrap_non_template(Context& ctx, const clang::FunctionDecl& decl) {
-   ctx.add(node<RoutineDecl>(
-       FunctionDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
-                    expect(ctx.header(decl), "failed to canonicalize source location"),
-                    transfer(ctx, decl), transfer_return_type(ctx, decl))));
+   ctx.add(node<RoutineDecl>(FunctionDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
+                                          ctx.dumb_header(decl), transfer(ctx, decl),
+                                          transfer_return_type(ctx, decl))));
 }
 
 fn assert_non_template(const clang::FunctionDecl& decl) {
    switch (decl.getTemplatedKind()) {
-      case clang::FunctionDecl::TK_NonTemplate:
-         break;
+      case clang::FunctionDecl::TK_NonTemplate: break;
       case clang::FunctionDecl::TK_FunctionTemplate:
       case clang::FunctionDecl::TK_MemberSpecialization:
       case clang::FunctionDecl::TK_FunctionTemplateSpecialization:
-      case clang::FunctionDecl::TK_DependentFunctionTemplateSpecialization: {
+      case clang::FunctionDecl::TK_DependentFunctionTemplateSpecialization:
          fatal("only simple function signatures are supported.");
-      }
    }
 }
 
@@ -522,10 +510,9 @@ fn wrap_non_template(Context& ctx, const clang::CXXConstructorDecl& decl) {
    // We don't wrap anonymous constructors since they take a supposedly anonymous type as a
    // parameter.
    if (ctx.access_guard(decl) && has_name(*decl.getParent())) {
-      ctx.add(node<RoutineDecl>(
-          ConstructorDecl(decl.getQualifiedNameAsString(),
-                          expect(ctx.header(decl), "failed to canonicalize source location"),
-                          map(ctx, decl.getParent()), transfer(ctx, decl))));
+      ctx.add(
+          node<RoutineDecl>(ConstructorDecl(decl.getQualifiedNameAsString(), ctx.dumb_header(decl),
+                                            map(ctx, decl.getParent()), transfer(ctx, decl))));
    }
 }
 
@@ -536,10 +523,9 @@ fn wrap(Context& ctx, const clang::CXXConstructorDecl& decl) {
 
 fn wrap_non_template(Context& ctx, const clang::CXXMethodDecl& decl) {
    if (ctx.access_guard(decl)) {
-      ctx.add(node<RoutineDecl>(MethodDecl(
-          decl.getNameAsString(), decl.getQualifiedNameAsString(),
-          expect(ctx.header(decl), "failed to canonicalize source location"),
-          map(ctx, decl.getParent()), transfer(ctx, decl), transfer_return_type(ctx, decl))));
+      ctx.add(node<RoutineDecl>(MethodDecl(decl.getNameAsString(), decl.getQualifiedNameAsString(),
+                                           ctx.dumb_header(decl), map(ctx, decl.getParent()),
+                                           transfer(ctx, decl), transfer_return_type(ctx, decl))));
    }
 }
 
@@ -597,38 +583,76 @@ fn transfer(Context& ctx, const clang::CXXRecordDecl::field_range fields) -> Vec
    return result;
 }
 
-/// FIXME: document this.
-fn transfer(Context& ctx, const clang::NamedDecl& name_decl, const clang::CXXRecordDecl& decl)
+fn transfer(Context& ctx, const clang::EnumDecl::enumerator_range fields) -> Vec<EnumFieldDecl> {
+   Vec<EnumFieldDecl> result;
+   for (auto field : fields) {
+      // FIXME: expose if a value was explicitly provided.
+      // auto expr = field->getInitExpr();
+      // if (expr) {
+      // } else {
+      // }
+      result.push_back(EnumFieldDecl(field->getNameAsString(), field->getInitVal().getExtValue()));
+   }
+   return result;
+}
+
+fn transfer(Context& ctx, const clang::NamedDecl& name_decl, const clang::EnumDecl& decl)
     ->Node<TypeDecl> {
-   if (has_name(name_decl)) {
-      return node<TypeDecl>(
-          RecordTypeDecl(qualified_nim_name(ctx, name_decl), name_decl.getQualifiedNameAsString(),
-                         expect(ctx.header(name_decl), "failed to canonicalize source location"),
-                         transfer(ctx, decl.fields())));
-   } else {
-      return node<TypeDecl>(
-          RecordTypeDecl("type_of(" + qualified_nim_name(ctx, ctx.decl()) + ")",
-                         "decltype(" + ctx.decl().getQualifiedNameAsString() + ")",
-                         expect(ctx.header(name_decl), "failed to canonicalize source location"),
-                         transfer(ctx, decl.fields())));
+   return node<TypeDecl>(EnumTypeDecl(qualified_nim_name(ctx, name_decl),
+                                      name_decl.getQualifiedNameAsString(), ctx.dumb_header(decl),
+                                      transfer(ctx, decl.enumerators())));
+}
+
+fn should_wrap(Context& ctx, const clang::EnumDecl& decl) -> bool {
+   return (ctx.access_guard(decl) && has_name(decl)) || ctx.map_mode();
+}
+
+fn wrap(Context& ctx, const clang::EnumDecl& decl) {
+   if (should_wrap(ctx, decl)) {
+      auto type_decl = transfer(ctx, decl, decl);
+      ctx.associate(decl, node<Type>(deref<EnumTypeDecl>(type_decl).name));
+      ctx.add(type_decl);
    }
 }
 
-fn transfer(Context& ctx, const clang::CXXRecordDecl& decl) -> Node<TypeDecl> {
-   return transfer(ctx, decl, decl);
+fn record_name(Context& ctx, const clang::NamedDecl& decl) -> Node<Sym> {
+   return has_name(decl) ? node<Sym>(qualified_nim_name(ctx, decl))
+                         : node<Sym>("type_of(" + qualified_nim_name(ctx, ctx.decl(1)) + ")");
+}
+
+/// FIXME: document this.
+fn transfer(Context& ctx, const Node<Sym> sym, const clang::NamedDecl& name_decl,
+            const clang::CXXRecordDecl& decl)
+    ->Node<TypeDecl> {
+   if (has_name(name_decl)) {
+      return node<TypeDecl>(RecordTypeDecl(sym, name_decl.getQualifiedNameAsString(),
+                                           ctx.dumb_header(name_decl),
+                                           transfer(ctx, decl.fields())));
+   } else {
+      return node<TypeDecl>(
+          RecordTypeDecl(sym, "decltype(" + ctx.decl(1).getQualifiedNameAsString() + ")",
+                         ctx.dumb_header(name_decl), transfer(ctx, decl.fields())));
+   }
 }
 
 fn should_wrap(const Context& ctx, const clang::CXXRecordDecl& decl) -> bool {
    // Unnamed types are wrapped when they get used.
-   return has_name(decl) || ctx.map_mode();
+   return !ctx.lookup(decl) && (has_name(decl) || ctx.map_mode());
+}
+
+fn get_def(const clang::CXXRecordDecl& decl) -> const clang::CXXRecordDecl& {
+   auto result = decl.getDefinition();
+   return result ? *result : decl;
 }
 
 fn wrap(Context& ctx, const clang::CXXRecordDecl& decl) {
-   if (should_wrap(ctx, decl)) {
-      auto type_decl = transfer(ctx, decl);
-      ctx.associate(decl, map(ctx, type_decl));
+   const auto& def_decl = get_def(decl);
+   if (should_wrap(ctx, def_decl)) {
+      auto name = record_name(ctx, def_decl);
+      ctx.associate(def_decl, node<Type>(name));
+      auto type_decl = transfer(ctx, name, def_decl, def_decl);
       ctx.add(type_decl);
-      wrap(ctx, decl.methods());
+      wrap(ctx, def_decl.methods());
    }
 }
 
@@ -647,7 +671,7 @@ fn get_cstddef_item(Context& ctx, const clang::NamedDecl& decl) -> Opt<Node<Type
 }
 
 /// Get the tag declaration that in defined inline with this typedef.
-fn owns_tag(const clang::TypedefNameDecl& decl) -> OptRef<const clang::TagDecl> {
+fn owns_tag(const clang::TypedefDecl& decl) -> OptRef<const clang::TagDecl> {
    // FIXME: how does a `typedef struct Foo tag`, where `struct Foo` is already declared.
    auto elaborated = llvm::dyn_cast<clang::ElaboratedType>(decl.getUnderlyingType());
    if (elaborated) {
@@ -660,36 +684,37 @@ fn owns_tag(const clang::TypedefNameDecl& decl) -> OptRef<const clang::TagDecl> 
 }
 
 fn wrap_alias(Context& ctx, const clang::TypedefNameDecl& decl) {
-   auto type_decl = node<TypeDecl>(
-       AliasTypeDecl(qualified_nim_name(ctx, decl), map(ctx, decl.getUnderlyingType())));
-   ctx.associate(decl, map(ctx, type_decl));
+   auto name = node<Sym>(qualified_nim_name(ctx, decl));
+   ctx.associate(decl, node<Type>(name));
+   auto type_decl = node<TypeDecl>(AliasTypeDecl(name, map(ctx, decl.getUnderlyingType())));
    ctx.add(type_decl);
 }
+
+fn wrap(Context& ctx, const clang::TypeAliasDecl& decl) { return wrap_alias(ctx, decl); }
 
 // When we wrap an anonymous tag typedef we need both the tag and typedef decls to map to the same
 // type. There are probably some bugs lurking there. Worst case we give these a TAG_Foo.
 
-fn wrap_anon(Context& ctx, const clang::TypedefNameDecl& typedef_decl,
+fn wrap_anon(Context& ctx, const clang::TypedefDecl& typedef_decl,
              const clang::CXXRecordDecl& decl) {
-   auto type_decl = transfer(ctx, typedef_decl, decl);
-   auto type = map(ctx, type_decl);
+   auto name = record_name(ctx, typedef_decl);
+   auto type = node<Type>(name);
    ctx.associate(decl, type);
    ctx.associate(typedef_decl, type);
+   auto type_decl = transfer(ctx, name, typedef_decl, decl);
    ctx.add(type_decl);
    wrap(ctx, decl.methods());
 }
 
-fn wrap_anon(Context& ctx, const clang::TypedefNameDecl& typedef_decl,
-             const clang::EnumDecl& decl) {
-   // auto type_decl = ;
-   // ctx.associate(decl, type_decl);
-   // ctx.associate(typedef_decl, type_decl);
-   // ctx.add(type_decl);
-   // FIXME: impliment
-   fatal("unimplimented: wrap_anon(EnumDecl)");
+fn wrap_anon(Context& ctx, const clang::TypedefDecl& typedef_decl, const clang::EnumDecl& decl) {
+   auto type_decl = transfer(ctx, typedef_decl, decl);
+   auto type = node<Type>(deref<EnumTypeDecl>(type_decl).name);
+   ctx.associate(decl, type);
+   ctx.associate(typedef_decl, type);
+   ctx.add(type_decl);
 }
 
-fn wrap_anon(Context& ctx, const clang::TypedefNameDecl& decl, const clang::TagDecl& tag_decl) {
+fn wrap_anon(Context& ctx, const clang::TypedefDecl& decl, const clang::TagDecl& tag_decl) {
    if (llvm::isa<clang::CXXRecordDecl>(tag_decl)) {
       wrap_anon(ctx, decl, llvm::cast<clang::CXXRecordDecl>(tag_decl));
    } else if (llvm::isa<clang::EnumDecl>(tag_decl)) {
@@ -707,24 +732,26 @@ fn eq_ident(const clang::NamedDecl& a, const clang::NamedDecl& b) -> bool {
 /// Wrap a type aliasing declaration.
 /// We produce something like `type AliasName* = UnderlyingType`.
 /// Typedefs for anonymous and tag types with identical names have special handling.
-fn wrap(Context& ctx, const clang::TypedefNameDecl& decl) {
-   // We map certain typedefs from the stdlib to builtins.
-   // FIXME: This tag special handling is only needed for `typedef` not `using`.
-   if (const auto tag_decl = owns_tag(decl)) {
-      if (has_name(*tag_decl)) {
-         if (eq_ident(decl, *tag_decl)) {
-            ctx.associate(decl, map(ctx, *tag_decl));
+fn wrap(Context& ctx, const clang::TypedefDecl& decl) {
+   if (!ctx.lookup(decl)) {
+      // We map certain typedefs from the stdlib to builtins.
+      // FIXME: This tag special handling is only needed for `typedef` not `using`.
+      if (const auto tag_decl = owns_tag(decl)) {
+         if (has_name(*tag_decl)) {
+            if (eq_ident(decl, *tag_decl)) {
+               ctx.associate(decl, map(ctx, *tag_decl));
+            } else {
+               wrap_alias(ctx, decl);
+            }
          } else {
-            wrap_alias(ctx, decl);
+            wrap_anon(ctx, decl, *tag_decl);
          }
+      } else if (const auto cstddef_item = get_cstddef_item(ctx, decl)) {
+         // References to the typedef should fold to our builtins.
+         ctx.associate(decl, *cstddef_item);
       } else {
-         wrap_anon(ctx, decl, *tag_decl);
+         wrap_alias(ctx, decl);
       }
-   } else if (const auto cstddef_item = get_cstddef_item(ctx, decl)) {
-      // References to the typedef should fold to our builtins.
-      ctx.associate(decl, *cstddef_item);
-   } else {
-      wrap_alias(ctx, decl);
    }
 }
 
@@ -735,30 +762,7 @@ fn is_visible(const clang::VarDecl& decl) -> bool {
 fn wrap(Context& ctx, const clang::VarDecl& decl) {
    if (ctx.access_guard(decl) && is_visible(decl)) {
       ctx.add(node<VariableDecl>(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
-                                 expect(ctx.header(decl), "failed to canonicalize source location"),
-                                 map(ctx, decl.getType())));
-   }
-}
-
-fn transfer(Context& ctx, const clang::EnumDecl::enumerator_range fields) -> Vec<EnumFieldDecl> {
-   Vec<EnumFieldDecl> result;
-   for (auto field : fields) {
-      // FIXME: expose if a value was explicitly provided.
-      // auto expr = field->getInitExpr();
-      // if (expr) {
-      // } else {
-      // }
-      result.push_back(EnumFieldDecl(field->getNameAsString(), field->getInitVal().getExtValue()));
-   }
-   return result;
-}
-
-fn wrap(Context& ctx, const clang::EnumDecl& decl) {
-   if (ctx.access_guard(decl)) {
-      ctx.add(node<TypeDecl>(
-          EnumTypeDecl(qualified_nim_name(ctx, decl), decl.getQualifiedNameAsString(),
-                       expect(ctx.header(decl), "failed to canonicalize source location"),
-                       transfer(ctx, decl.enumerators()))));
+                                 ctx.dumb_header(decl), map(ctx, decl.getType())));
    }
 }
 
@@ -784,7 +788,7 @@ fn wrap(Context& ctx, const clang::EnumDecl& decl) {
 
 fn wrap(Context& ctx, const clang::NamedDecl& decl) -> void {
    auto header = ctx.header(decl);
-   if (header) {
+   if (header || ctx.map_mode()) {
       ctx.push(decl);
       switch (decl.getKind()) {
          // DISCARD(Record); // We should not get these here.
@@ -806,8 +810,7 @@ fn wrap(Context& ctx, const clang::NamedDecl& decl) -> void {
          DISPATCH(Enum);
          DISPATCH(Function); // A free function
          DISPATCH(Var);
-         default:
-            fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
+         default: fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
       }
       ctx.pop_decl();
    }
@@ -841,9 +844,7 @@ fn wrap(Context& ctx, const clang::Decl& decl) {
       DISCARD(TranslationUnit);
       // NamedDecls
       DISPATCH_ANY(Named)
-      default:
-         decl.dump();
-         fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
+      default: decl.dump(); fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
    }
 }
 
@@ -868,7 +869,7 @@ class Main : public clang::RecursiveASTVisitor<Main> {
    }
 
    /// Load a translation unit from user provided arguments with additional include path arguments.
-   priv fn parse_tu() -> std::unique_ptr<clang::ASTUnit> {
+   priv fn parse_translation_unit() -> std::unique_ptr<clang::ASTUnit> {
       Vec<Str> args = {"-xc++"};
       auto search_paths = prefixed_search_paths();
       args.insert(args.end(), search_paths.begin(), search_paths.end());
@@ -887,13 +888,14 @@ class Main : public clang::RecursiveASTVisitor<Main> {
       os::write_file(os::set_file_ext(ctx.cfg.output(), ".nim"), output);
    }
 
-   pub Main(const Config& cfg) : cfg(cfg), tu(parse_tu()), ctx(cfg, tu->getASTContext()) {
+   pub Main(const Config& cfg)
+      : cfg(cfg), tu(parse_translation_unit()), ctx(cfg, tu->getASTContext()) {
       // Collect all our declarations.
       auto result = TraverseAST(tu->getASTContext());
-      if (!result) { // Idk wtf this thing means? It is true even with errors...
-         fatal("Main failed");
-      } else {
+      if (result) { // Idk wtf this thing means? It is true even with errors...
          finalize();
+      } else {
+         fatal("Main failed");
       }
    }
 

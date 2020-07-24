@@ -8,10 +8,6 @@ cpp_compile_src("ensnare"/"private"/"ir.cpp")
 cpp_compile_src("ensnare"/"private"/"config.cpp")
 cpp_compile_src("ensnare"/"private"/"render.cpp")
 cpp_compile_src("ensnare"/"private"/"main.cpp")
-
-
-cpp_forward_compiler("")
-
 build.flags()
 
 proc run(argc: CppInt, argv: CppUnsizedArray[CppCharPtr])

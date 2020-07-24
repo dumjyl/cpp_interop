@@ -1,7 +1,7 @@
 import ensnare/private/[os_utils, app_utils], std/os
 from strutils import indent
 
-const tests = ["typedefs", "abc"]
+const tests = ["typedefs", "abc", "redecls"]
 
 proc nim_gen_file(name: string): string = "tests"/"units"/"gen"/name.change_file_ext(".nim")
 
@@ -19,7 +19,7 @@ proc units =
       if code == 0:
          if output.len != 0:
             echo "Ensnare Output:\n"
-            echo output
+            echo indent(output, 3)
          let (diff_output, diff_code) = exec("diff", ["--color=always", "-u",
                                                       nim_test_file(test),
                                                       nim_gen_file(test)])

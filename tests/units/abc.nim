@@ -1,10 +1,9 @@
 import ensnare/runtime
 export runtime
 
-# --- types
-
 type
    `blah-Foo`* {.import_cpp: "blah::Foo", header: "abc.hpp".} = object
+      recursive_field: ptr `blah-Foo`
    SomeEnum* {.import_cpp: "SomeEnum", header: "abc.hpp".} = enum
       a = 0
       b = 1
@@ -18,17 +17,21 @@ type
       xyz_field: `type_of(XYZ-xyz_field)`
    `type_of(anon_union_var)`* {.import_cpp: "decltype(anon_union_var)", header: "abc.hpp".} = object
 
-# --- routines
-
 proc `{}`*(�: type[`blah-Foo`], a: CppInt, b: CppInt): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
+proc recusive_meth*(�: `blah-Foo`, x: ptr `blah-Foo`)
+   {.import_cpp: "blah::Foo::recusive_meth(@)", header: "abc.hpp".}
 proc calc*(�: `blah-Foo`, x: CppInt): CppInt
    {.import_cpp: "blah::Foo::calc(@)", header: "abc.hpp".}
 proc `{}`*(�: type[`blah-Foo`], �1: var `blah-Foo`): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
 
-# --- variables
-
 var
    `blah-x`* {.import_cpp: "blah::x", header: "abc.hpp".}: `blah-Foo`
    anon_union_var* {.import_cpp: "anon_union_var", header: "abc.hpp".}: `type_of(anon_union_var)`
+   ��your_identifiers_are��the���worst�* {.import_cpp: "__your_identifiers_are__the___worst_", header: "abc.hpp".}: CppInt
+   �abc��a* {.import_cpp: "_abc__a", header: "abc.hpp".}: CppInt
+   abc_a�* {.import_cpp: "abc_a_", header: "abc.hpp".}: CppInt
+   abc_a���* {.import_cpp: "abc_a___", header: "abc.hpp".}: CppInt
+   ��* {.import_cpp: "__", header: "abc.hpp".}: CppInt
+   �* {.import_cpp: "_", header: "abc.hpp".}: CppInt
