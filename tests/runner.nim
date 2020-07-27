@@ -2,18 +2,19 @@ import ensnare/private/[os_utils, app_utils], std/os
 from strutils import indent
 
 const tests = ["typedefs", "abc", "redecls"]
+const units = "tests"/"units"
 
-proc nim_gen_file(name: string): string = "tests"/"units"/"gen"/name.change_file_ext(".nim")
+proc nim_gen_file(name: string): string = units/"gen"/name.change_file_ext(".nim")
 
-proc nim_test_file(name: string): string = "tests"/"units"/name.change_file_ext(".nim")
+proc nim_test_file(name: string): string = units/name.change_file_ext(".nim")
 
-proc hpp_test_file(name: string): string = "tests"/"units"/name.change_file_ext(".hpp")
+proc hpp_test_file(name: string): string = units/name.change_file_ext(".hpp")
 
 proc invoke(name: string): (string, int) =
-   result = exec("bin/ensnare", [nim_gen_file(name), "-I" & "tests"/"units",
+   result = exec("bin/ensnare", ["-include-dir=" & units, nim_gen_file(name), "-I" & units,
                                  name.change_file_ext(".hpp")])
 
-proc units =
+proc run_tests =
    for test in tests:
       let (output, code) = invoke(test)
       if code == 0:
@@ -37,4 +38,4 @@ proc units =
          quit 1
 
 main:
-   units()
+   run_tests()

@@ -4,6 +4,7 @@ export runtime
 type
    `blah-Foo`* {.import_cpp: "blah::Foo", header: "abc.hpp".} = object
       recursive_field: ptr `blah-Foo`
+   `blah-VP`* = pointer
    SomeEnum* {.import_cpp: "SomeEnum", header: "abc.hpp".} = enum
       a = 0
       b = 1
@@ -25,6 +26,8 @@ proc calc*(�: `blah-Foo`, x: CppInt): CppInt
    {.import_cpp: "blah::Foo::calc(@)", header: "abc.hpp".}
 proc `{}`*(�: type[`blah-Foo`], �1: var `blah-Foo`): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
+proc sum*(a: CppFloat, b: CppFloat): CppFloat
+   {.import_cpp: "blah::sum(@)", header: "abc.hpp".}
 
 var
    `blah-x`* {.import_cpp: "blah::x", header: "abc.hpp".}: `blah-Foo`

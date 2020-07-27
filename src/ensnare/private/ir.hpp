@@ -19,6 +19,7 @@ class Sym {
    priv Vec<Str> detail;
    priv bool _no_stropping; ///< This symbol does not require stropping even if it is a keyword.
    pub Sym(Str name, bool no_stropping = false);
+   pub void update(Str name);
    pub fn latest() const -> Str;
    pub fn no_stropping() const -> bool;
 };
@@ -116,6 +117,8 @@ class RecordTypeDecl {
 
 /// Some kind of type declaration. Should be stored within a Node.
 using TypeDecl = Union<AliasTypeDecl, EnumTypeDecl, RecordTypeDecl>;
+
+fn name(Node<TypeDecl> decl) -> Sym&;
 
 /// A routine parameter declaration.
 class ParamDecl {

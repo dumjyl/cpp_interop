@@ -44,4 +44,6 @@ Builtin _ptrdiff = init("CppPtrDiff");    ///< Represents `std::ptrdiff_t`.
 Builtin _max_align = init("CppMaxAlign"); ///< Represents `std::max_align_t`.
 Builtin _byte = init("CppByte");          ///< Represents `std::byte`.
 Builtin _nullptr = init("CppNullPtr");    ///< Represents `decltype(nullptr)` and `std::nullptr_t`.
+
+Builtin _void_ptr = init("pointer");
 } // namespace ensnare::builtins

@@ -1,5 +1,9 @@
-typedef struct inner outer;
+#include "redecls2.hpp"
 
-struct inner {
-   outer* next;
+typedef struct foo foo_t;
+
+struct foo {
+   foo_t* base;
 };
+
+lexbor_mem_chunk_t type_map;

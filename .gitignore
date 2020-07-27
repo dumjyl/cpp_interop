@@ -1,3 +1,4 @@
 /bin
 /tests/units/gen
 *.o
+*/raw.nim

@@ -16,6 +16,10 @@ class Foo {
    int calc(int x) { return x + a + b; }
 };
 
+using VP = void*;
+
+auto sum(float a, float b) -> float { return a + b; }
+
 blah::Foo x(1, 2);
 } // namespace blah
 

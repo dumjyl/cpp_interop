@@ -70,7 +70,6 @@ fn render(const Node<Sym> sym) -> Str {
       result += "�";
    }
    if (!sym->no_stropping() && (non_ident_char || is_keyword)) {
-
       return "`" + result + "`";
    } else {
       return result;

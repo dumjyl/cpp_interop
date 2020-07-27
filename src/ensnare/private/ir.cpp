@@ -5,6 +5,8 @@
 
 ensnare::Sym::Sym(Str name, bool no_stropping) : detail({name}), _no_stropping(no_stropping) {}
 
+void ensnare::Sym::update(Str name) { detail.push_back(name); }
+
 fn ensnare::Sym::latest() const -> Str { return detail.back(); }
 
 fn ensnare::Sym::no_stropping() const -> bool { return _no_stropping; }
@@ -45,6 +47,18 @@ ensnare::RecordTypeDecl::RecordTypeDecl(Str name, Str cpp_name, Str header,
 ensnare::RecordTypeDecl::RecordTypeDecl(Node<Sym> name, Str cpp_name, Str header,
                                         Vec<RecordFieldDecl> fields)
    : name(name), cpp_name(cpp_name), header(header), fields(fields) {}
+
+fn ensnare::name(Node<TypeDecl> decl) -> Sym& {
+   if (is<AliasTypeDecl>(decl)) {
+      return *deref<AliasTypeDecl>(decl).name;
+   } else if (is<EnumTypeDecl>(decl)) {
+      return *deref<EnumTypeDecl>(decl).name;
+   } else if (is<RecordTypeDecl>(decl)) {
+      return *deref<RecordTypeDecl>(decl).name;
+   } else {
+      fatal("unreachable: render(TypeDecl)");
+   }
+}
 
 ensnare::ParamDecl::ParamDecl(Str name, Node<Type> type) : _name(node<Sym>(name)), _type(type) {}
 
