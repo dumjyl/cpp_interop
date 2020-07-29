@@ -37,6 +37,10 @@ ensnare::EnumFieldDecl::EnumFieldDecl(Str name, std::int64_t val)
 ensnare::EnumTypeDecl::EnumTypeDecl(Str name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields)
    : name(node<Sym>(name)), cpp_name(cpp_name), header(header), fields(fields) {}
 
+ensnare::EnumTypeDecl::EnumTypeDecl(Node<Sym> name, Str cpp_name, Str header,
+                                    Vec<EnumFieldDecl> fields)
+   : name(name), cpp_name(cpp_name), header(header), fields(fields) {}
+
 ensnare::RecordFieldDecl::RecordFieldDecl(Str name, Node<Type> type)
    : name(node<Sym>(name)), type(type) {}
 

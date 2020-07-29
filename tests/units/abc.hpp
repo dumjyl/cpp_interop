@@ -49,3 +49,7 @@ int abc_a_;
 int abc_a___;
 int __;
 int _;
+
+struct SepTypedef {};
+
+typedef struct SepTypedef SepTypedef;

@@ -18,6 +18,7 @@ class Config {
    priv Vec<Str> _user_clang_args;
    priv Vec<Str> _include_dirs;
    priv Vec<Str> _syms;
+   priv Vec<Str> _gensym_types;
    priv bool _fold_type_suffix;
    priv bool _disable_includes;
 
@@ -33,6 +34,7 @@ class Config {
    pub fn include_dirs() const -> const Vec<Str>&;
    /// Specifies specific symbols to bind instead of trying to be smart.
    pub fn syms() const -> const Vec<Str>&;
+   pub fn gensym_types() const -> const Vec<Str>&;
    /// If we should try to find some reasonable include search paths from a compiler.
    pub fn disable_includes() const -> bool;
    pub fn fold_type_suffix() const -> bool;

@@ -17,6 +17,7 @@ type
    XYZ* {.import_cpp: "XYZ", header: "abc.hpp".} = object
       xyz_field: `type_of(XYZ-xyz_field)`
    `type_of(anon_union_var)`* {.import_cpp: "decltype(anon_union_var)", header: "abc.hpp".} = object
+   SepTypedef* {.import_cpp: "SepTypedef", header: "abc.hpp".} = object
 
 proc `{}`*(�: type[`blah-Foo`], a: CppInt, b: CppInt): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}

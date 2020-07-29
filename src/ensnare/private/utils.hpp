@@ -87,6 +87,11 @@ template <typename T> fn expect(Opt<T> self, const Str& msg) -> T {
       fatal("failed to unpack a none variant; " + msg);
    }
 }
+
+template <typename T> fn eq_ref(T& a, T& b) -> bool {
+   return reinterpret_cast<std::uintptr_t>(std::addressof(a)) ==
+          reinterpret_cast<std::uintptr_t>(std::addressof(b));
+}
 }; // namespace ensnare
 
 #include "ensnare/private/undef_syn.hpp"

@@ -8,6 +8,7 @@
 namespace cl = llvm::cl;
 using namespace ensnare;
 cl::list<Str> syms("sym", cl::desc("specify specific symbols to bind. FIXME: not implimented"));
+cl::list<Str> gensym_types("gensym-type", cl::desc("mangle a type symbol"));
 cl::list<Str> include_dirs("include-dir", cl::desc("allow binding any headers in this directory"));
 cl::opt<bool> fold_type_suffix("fold-type-suffix",
                                cl::desc("fold the inner type of a typedef with _t suffix"));
@@ -20,6 +21,7 @@ fn ensnare::Config::headers() const -> const Vec<Header>& { return _headers; }
 fn ensnare::Config::output() const -> const Str& { return _output; }
 fn ensnare::Config::user_clang_args() const -> const Vec<Str>& { return _user_clang_args; }
 fn ensnare::Config::syms() const -> const Vec<Str>& { return _syms; }
+fn ensnare::Config::gensym_types() const -> const Vec<Str>& { return _gensym_types; }
 fn ensnare::Config::include_dirs() const -> const Vec<Str>& { return _include_dirs; }
 fn ensnare::Config::disable_includes() const -> bool { return _disable_includes; }
 fn ensnare::Config::fold_type_suffix() const -> bool { return _fold_type_suffix; }
@@ -27,6 +29,7 @@ fn ensnare::Config::fold_type_suffix() const -> bool { return _fold_type_suffix;
 ensnare::Config::Config(int argc, const char* argv[]) {
    llvm::cl::ParseCommandLineOptions(argc, argv);
    _syms = ::syms;
+   _gensym_types = ::gensym_types;
    _include_dirs = ::include_dirs;
    _fold_type_suffix = ::fold_type_suffix;
    _disable_includes = ::disable_includes;

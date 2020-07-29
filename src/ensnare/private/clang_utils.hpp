@@ -79,12 +79,23 @@ fn has_name(const clang::NamedDecl& decl) -> bool { return decl.getIdentifier();
 
 /// Get the tag declaration that in defined inline with this typedef.
 fn owns_tag(const clang::TypedefDecl& decl) -> OptRef<const clang::TagDecl> {
-   // FIXME: how does a `typedef struct Foo tag`, where `struct Foo` is already declared.
-   auto elaborated = llvm::dyn_cast<clang::ElaboratedType>(decl.getUnderlyingType());
-   if (elaborated) {
-      auto tag = elaborated->getOwnedTagDecl();
-      if (tag) {
+   if (auto elaborated = llvm::dyn_cast<clang::ElaboratedType>(decl.getUnderlyingType())) {
+      if (auto tag = elaborated->getOwnedTagDecl()) {
          return get_definition(*tag);
+      }
+   }
+   return {};
+}
+
+fn qual_name(const clang::NamedDecl& decl) -> Str { return decl.getQualifiedNameAsString(); }
+
+fn qual_name(const clang::NamedDecl* decl) -> Str { return qual_name(*decl); }
+
+fn inner_tag(const clang::TypedefDecl& decl) -> OptRef<const clang::TagDecl> {
+   // FIXME: how does a `typedef struct Foo tag`, where `struct Foo` is already declared.
+   if (auto elaborated = llvm::dyn_cast<clang::ElaboratedType>(decl.getUnderlyingType())) {
+      if (auto tag_type = llvm::dyn_cast<clang::TagType>(elaborated->getNamedType().getTypePtr())) {
+         return *tag_type->getDecl();
       }
    }
    return {};

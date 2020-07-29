@@ -97,6 +97,7 @@ class EnumTypeDecl {
    pub const Str header;
    pub const Vec<EnumFieldDecl> fields;
    pub EnumTypeDecl(Str name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields);
+   pub EnumTypeDecl(Node<Sym> name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields);
 };
 
 class RecordFieldDecl {
