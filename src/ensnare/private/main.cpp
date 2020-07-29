@@ -44,10 +44,7 @@ class SymGenerator {
       for (auto i = static_cast<int>('a'); i < static_cast<int>('z'); i += 1) {
          result.push_back(static_cast<char>(i));
       }
-      for (auto i = static_cast<int>('A'); i < static_cast<int>('Z'); i += 1) {
-         result.push_back(static_cast<char>(i));
-      }
-      for (auto i = static_cast<int>('0'); i < static_cast<int>('1'); i += 1) {
+      for (auto i = static_cast<int>('0'); i < static_cast<int>('9'); i += 1) {
          result.push_back(static_cast<char>(i));
       }
       return result;
@@ -324,8 +321,7 @@ fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
       case clang::BuiltinType::Kind::ObjCId:
       case clang::BuiltinType::Kind::ObjCClass:
       case clang::BuiltinType::Kind::ObjCSel: fatal("obj-c builtins unsupported");
-      case clang::BuiltinType::Kind::Char_S: // 'char' for targets where it's signed.
-         fatal("this should be unreachable because nim compiles with unsigned chars");
+      case clang::BuiltinType::Kind::Char_S: fatal("unreachable: implicit signed char");
       case clang::BuiltinType::Kind::Dependent:
       case clang::BuiltinType::Kind::Overload:
       case clang::BuiltinType::Kind::BoundMember:
@@ -342,7 +338,7 @@ fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
       case clang::BuiltinType::Kind::Int: return builtins::_int;
       case clang::BuiltinType::Kind::Long: return builtins::_long;
       case clang::BuiltinType::Kind::LongLong: return builtins::_long_long;
-      case clang::BuiltinType::Kind::UChar: return builtins::_char;
+      case clang::BuiltinType::Kind::UChar: return builtins::_uchar;
       case clang::BuiltinType::Kind::UShort: return builtins::_ushort;
       case clang::BuiltinType::Kind::UInt: return builtins::_uint;
       case clang::BuiltinType::Kind::ULong: return builtins::_ulong;
@@ -374,18 +370,18 @@ fn map(Context& ctx, const clang::BuiltinType& entity) -> Node<Type> {
 /// Map a const/volatile/__restrict qualified type.
 fn map(Context& ctx, const clang::QualType& entity) -> Node<Type> {
    // Too niche to care about for now.
-   // if (entity.isRestrictQualified() || entity.isVolatileQualified()) {
-   //   fatal("volatile and restrict qualifiers unsupported");
-   //}
+   //  if (entity.isRestrictQualified() || entity.isVolatileQualified()) {
+   //    fatal("volatile and restrict qualifiers unsupported");
+   // }
    auto type = entity.getTypePtr();
    if (type) {
       auto result = map(ctx, *type);
-      if (entity.isConstQualified()) { // FIXME: `isLocalConstQualified`: do
-                                       // we care about local vs non-local?
-                                       // This will be usefull later.
-                                       // result->flag_const();
+      // FIXME: `isLocalConstQualified`: do we care about local vs non-local?
+      if (entity.isConstQualified() && !ctx.cfg.ignore_const()) {
+         return node<Type>(ConstType(result));
+      } else {
+         return result;
       }
-      return result;
    } else {
       fatal("QualType inner type was null");
    }
@@ -424,15 +420,17 @@ fn map(Context& ctx, const clang::Type& type) -> Node<Type> {
          return map(ctx, get_definition(llvm::cast<clang::EnumType>(type).getDecl()));
       case clang::Type::TypeClass::Pointer: {
          const auto& ty = llvm::cast<clang::PointerType>(type);
-         // FIXME: fix function pointers.
          if (ty.isVoidPointerType()) {
             return builtins::_void_ptr;
+         } else if (ty.isFunctionPointerType()) {
+            return map(ctx, ty.getPointeeType());
          } else {
             return node<Type>(PtrType(map(ctx, ty.getPointeeType())));
          }
       }
       case clang::Type::TypeClass::LValueReference:
       case clang::Type::TypeClass::RValueReference:
+         // FIXME: this may be wrong for function pointers.
          return node<Type>(
              RefType(map(ctx, llvm::cast<clang::ReferenceType>(type).getPointeeType())));
       case clang::Type::TypeClass::Vector:
@@ -491,6 +489,33 @@ fn wrap_non_template(Context& ctx, const clang::FunctionDecl& decl) {
                                           transfer(ctx, decl), transfer_return_type(ctx, decl))));
 }
 
+fn template_arguments(Context& ctx, const clang::FunctionDecl& decl) -> Vec<TemplateParamDecl> {
+   Vec<TemplateParamDecl> result;
+   for (auto argument : decl.getDescribedFunctionTemplate()->getInjectedTemplateArgs()) {
+      switch (argument.getKind()) {
+         case clang::TemplateArgument::ArgKind::Null:
+         case clang::TemplateArgument::ArgKind::Type:
+         case clang::TemplateArgument::ArgKind::Declaration:
+         case clang::TemplateArgument::ArgKind::NullPtr:
+         case clang::TemplateArgument::ArgKind::Integral:
+         case clang::TemplateArgument::ArgKind::Template:
+         case clang::TemplateArgument::ArgKind::TemplateExpansion:
+         case clang::TemplateArgument::ArgKind::Expression:
+         case clang::TemplateArgument::ArgKind::Pack:
+            print(render(decl.getDescribedFunctionTemplate()));
+            print(render(argument));
+            fatal("unhandled template argument");
+      }
+   }
+   return result;
+}
+
+fn wrap_template(Context& ctx, const clang::FunctionDecl& decl) {
+   ctx.add(node<RoutineDecl>(TemplateFunctionDecl(
+       decl.getNameAsString(), qual_name(decl), ctx.header(decl), template_arguments(ctx, decl),
+       transfer(ctx, decl), transfer_return_type(ctx, decl))));
+}
+
 fn assert_non_template(const clang::FunctionDecl& decl) {
    switch (decl.getTemplatedKind()) {
       case clang::FunctionDecl::TK_NonTemplate: break;
@@ -503,8 +528,14 @@ fn assert_non_template(const clang::FunctionDecl& decl) {
 }
 
 fn wrap_function(Context& ctx, const clang::FunctionDecl& decl) {
-   assert_non_template(decl);
-   wrap_non_template(ctx, decl);
+   switch (decl.getTemplatedKind()) {
+      case clang::FunctionDecl::TK_NonTemplate: wrap_non_template(ctx, decl); break;
+      case clang::FunctionDecl::TK_FunctionTemplate: wrap_template(ctx, decl); break;
+      case clang::FunctionDecl::TK_MemberSpecialization:
+      case clang::FunctionDecl::TK_FunctionTemplateSpecialization:
+      case clang::FunctionDecl::TK_DependentFunctionTemplateSpecialization:
+         fatal("only simple function signatures are supported.");
+   }
 }
 
 fn wrap_non_template(Context& ctx, const clang::CXXConstructorDecl& decl) {
@@ -741,7 +772,9 @@ fn force_wrap(Context& ctx, const clang::NamedDecl& named_decl) -> void {
          case clang::Decl::Kind::Typedef:
             wrap_typedef(ctx, llvm::cast<clang::TypedefDecl>(named_decl));
             break;
-         default: fatal("unhandled force_wrap: ", named_decl.getDeclKindName(), "Decl");
+         default:
+            print(render(named_decl));
+            fatal("unhandled force_wrap: ", named_decl.getDeclKindName(), "Decl");
       }
       ctx.pop_decl();
    }
@@ -778,14 +811,18 @@ fn wrap(Context& ctx, const clang::NamedDecl& named_decl) -> void {
          case clang::Decl::Kind::NamespaceAlias:
          case clang::Decl::Kind::Field:
          case clang::Decl::Kind::ParmVar:
+         case clang::Decl::Kind::TemplateTypeParm:
          case clang::Decl::Kind::Using:
          case clang::Decl::Kind::EnumConstant:
          case clang::Decl::Kind::CXXMethod:
          case clang::Decl::Kind::CXXConstructor:
-         case clang::Decl::Kind::CXXDestructor: {
+         case clang::Decl::Kind::CXXDestructor:
+         case clang::Decl::Kind::FunctionTemplate: {
             break; // discarded
          }
-         default: fatal("unhandled wrapping: ", named_decl.getDeclKindName(), "Decl");
+         default:
+            print(render(named_decl));
+            fatal("unhandled wrapping: ", named_decl.getDeclKindName(), "Decl");
       }
       ctx.pop_decl();
    }
@@ -822,7 +859,7 @@ fn base_wrap(Context& ctx, const clang::Decl& decl) {
          wrap(ctx, llvm::cast<clang::NamedDecl>(decl));
          break;
       }
-      default: decl.dump(); fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
+      default: print(render(decl)); fatal("unhandled wrapping: ", decl.getDeclKindName(), "Decl");
    }
 }
 
@@ -836,9 +873,12 @@ fn prefixed_search_paths() -> Vec<Str> {
 
 /// Load a translation unit from user provided arguments with additional include path arguments.
 fn parse_translation_unit(const Config& cfg) -> std::unique_ptr<clang::ASTUnit> {
-   Vec<Str> args = {"-xc++"};
+   Vec<Str> args = {"-xc++", "-funsigned-char"};
    auto search_paths = prefixed_search_paths();
    args.insert(args.end(), search_paths.begin(), search_paths.end());
+   for (auto include_dir : cfg.include_dirs()) {
+      args.push_back("-I" + include_dir);
+   }
    // The users args get placed after for higher priority.
    args.insert(args.end(), cfg.user_clang_args().begin(), cfg.user_clang_args().end());
    return clang::tooling::buildASTFromCodeWithArgs(cfg.header_file(), args, "ensnare_headers.hpp",

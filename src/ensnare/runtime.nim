@@ -2,6 +2,7 @@
 #               this is c++20ish, but we target c++17
 
 import private/macro_utils
+from std/os import `/`, parent_dir
 
 const hpp = "ensnare/private/runtime.hpp"
 
@@ -74,7 +75,7 @@ type
    CppULong* {.import_cpp: "unsigned long int".} = uint64
    CppULongLong* {.import_cpp: "unsigned long long int".} = uint64
    # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#7
-   CppChar* = char
+   CppChar* {.import_cpp: "char".} = char
 
 # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#8
 when defined(windows): # FIXME: when is this signed and unsigned
@@ -109,7 +110,8 @@ type # exntensions
 type
    CppConst*[T] {.import_cpp: "ensnare::runtime::Constant<'0>", header: hpp.} = object
    CppUnsizedArray*[T] {.import_cpp: "ensnare::runtime::UnsizedArray<'0>", header: hpp.} = object
-   CppCharPtr* = ptr CppConst[char]
+   CppCharPtr* = ptr CppConst[CppChar]
+   CppUCharPtr* = ptr CppConst[CppUChar]
 
 proc `=`*[T](dst: var CppUnsizedArray[T], src: CppUnsizedArray[T]) {.error.}
 proc `=sink`*[T](dst: var CppUnsizedArray[T], src: CppUnsizedArray[T]) {.error.}
@@ -127,12 +129,12 @@ proc cpp_static_assert*(condition: bool, message: CppCharPtr) {.import_cpp: "sta
 proc cpp_size_of*[T](_: T): CppSize {.import_cpp: "sizeof(@)".}
 proc cpp_size_of*[T](_: type[T]): CppSize {.import_cpp: "sizeof('0)".}
 
-var cpp_standard {.no_decl, import_cpp: "__cplusplus".}: CppLong
-
-template c_str(str: untyped{nkStrLit}): CppCharPtr =
+template char_ptr*(str: string): CppCharPtr =
    cast[CppCharPtr](str.c_string)
 
-cpp_static_assert(cpp_standard >= 201703.CppLong, "c++17 or later is required".c_str)
+#template uchar_ptr*(str: string): CppUCharPtr =
+#   cast[CppUCharPtr](str.c_string)
+
 #cpp_static_assert(cpp_size_of(cpp_int) == 4, "Only LP64 systems are supported")
 #cpp_static_assert(cpp_size_of(cpp_long) == 8, "Only LP64 systems are supported")
 
@@ -160,6 +162,11 @@ template cpp_compile_src*(src: static[string]) =
 template emit_cpp*(src: static[string]) =
    {.emit: src.}
 
+emit_cpp"""
+static_assert(__cplusplus >= 201703UL, "c++17 or later is required");
+"""
+
+cpp_include_dir(current_source_path().parent_dir.parent_dir)
 cpp_forward_compiler("-std=c++17")
 
 when defined(address_sanitizer):

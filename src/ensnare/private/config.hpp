@@ -19,8 +19,9 @@ class Config {
    priv Vec<Str> _include_dirs;
    priv Vec<Str> _syms;
    priv Vec<Str> _gensym_types;
-   priv bool _fold_type_suffix;
    priv bool _disable_includes;
+   priv bool _fold_type_suffix;
+   priv bool _ignore_const;
 
    /// The output location.
    /// It is the first positional argument.
@@ -38,6 +39,7 @@ class Config {
    /// If we should try to find some reasonable include search paths from a compiler.
    pub fn disable_includes() const -> bool;
    pub fn fold_type_suffix() const -> bool;
+   pub fn ignore_const() const -> bool;
    /// Make a Config from unparsed command line parameters.
    pub Config(int argc, const char* argv[]);
    /// A header file with all the headers"()" rendered together.

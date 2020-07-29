@@ -24,6 +24,8 @@ ensnare::ArrayType::ArrayType(std::size_t size, Node<Type> type) : size(size), t
 ensnare::FuncType::FuncType(Vec<Node<Type>> formals, Node<Type> return_type)
    : formals(formals), return_type(return_type) {}
 
+ensnare::ConstType::ConstType(Node<Type> type) : type(type) {}
+
 ensnare::AliasTypeDecl::AliasTypeDecl(Str name, Node<Type> type)
    : name(node<Sym>(name)), type(type) {}
 
@@ -90,6 +92,17 @@ ensnare::MethodDecl::MethodDecl(Str name, Str cpp_name, Str header, Node<Type> s
      cpp_name(cpp_name),
      header(header),
      self(self),
+     formals(formals),
+     return_type(return_type) {}
+
+ensnare::TemplateFunctionDecl::TemplateFunctionDecl(Str name, Str cpp_name, Str header,
+                                                    Vec<TemplateParamDecl> generics,
+                                                    Vec<ParamDecl> formals,
+                                                    Opt<Node<Type>> return_type)
+   : name(node<Sym>(name)),
+     cpp_name(cpp_name),
+     header(header),
+     generics(generics),
      formals(formals),
      return_type(return_type) {}
 

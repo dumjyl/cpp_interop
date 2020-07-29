@@ -35,6 +35,13 @@ fn render(const clang::Decl* decl) -> Str {
    }
 }
 
+fn render(clang::TemplateArgument arg) -> Str {
+   Str temp;
+   llvm::raw_string_ostream stream(temp);
+   arg.dump(stream);
+   return stream.str();
+}
+
 inline fn log(Str msg, const clang::NamedDecl& decl) {
    if constexpr (debug) {
       print(msg, " ", decl.getDeclKindName(), " ", decl.getQualifiedNameAsString());

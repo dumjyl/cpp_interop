@@ -31,10 +31,11 @@ class InstType;
 class UnsizedArrayType;
 class ArrayType;
 class FuncType;
+class ConstType;
 
 /// Some kind of type. Should be stored within a Node.
-using Type =
-    Union<Node<Sym>, PtrType, RefType, OpaqueType, InstType, UnsizedArrayType, ArrayType, FuncType>;
+using Type = Union<Node<Sym>, PtrType, RefType, OpaqueType, InstType, UnsizedArrayType, ArrayType,
+                   FuncType, ConstType>;
 
 /// Just a raw pointer.
 class PtrType {
@@ -71,6 +72,11 @@ class FuncType {
    pub const Vec<Node<Type>> formals;
    pub const Node<Type> return_type;
    pub FuncType(Vec<Node<Type>> formals, Node<Type> return_type);
+};
+
+class ConstType {
+   pub const Node<Type> type;
+   pub ConstType(Node<Type> type);
 };
 
 /// A `type Foo = Bar[X, Y]` like declaration.
@@ -131,6 +137,8 @@ class ParamDecl {
    pub ParamDecl(Node<Sym> name, Node<Type> type);
 };
 
+class TemplateParamDecl {};
+
 /// A non method function declaration.
 class FunctionDecl {
    pub const Node<Sym> name;
@@ -163,8 +171,19 @@ class MethodDecl {
                   Opt<Node<Type>> return_type);
 };
 
+class TemplateFunctionDecl {
+   pub const Node<Sym> name;
+   pub const Str cpp_name;
+   pub const Str header;
+   pub const Vec<TemplateParamDecl> generics;
+   pub const Vec<ParamDecl> formals;
+   pub const Opt<Node<Type>> return_type;
+   pub TemplateFunctionDecl(Str name, Str cpp_name, Str header, Vec<TemplateParamDecl> generics,
+                            Vec<ParamDecl> formals, Opt<Node<Type>> return_type);
+};
+
 /// Some kind of routine declaration. Should be stored within a Node.
-using RoutineDecl = Union<FunctionDecl, ConstructorDecl, MethodDecl>;
+using RoutineDecl = Union<FunctionDecl, ConstructorDecl, MethodDecl, TemplateFunctionDecl>;
 
 /// A variable declaration.
 class VariableDecl {

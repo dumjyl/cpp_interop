@@ -1,7 +1,7 @@
 import ensnare/private/[os_utils, app_utils], std/os
 from strutils import indent
 
-const tests = ["typedefs", "abc", "redecls"]
+const tests = ["typedefs", "abc", "redecls", "templ"]
 const units = "tests"/"units"
 
 proc nim_gen_file(name: string): string = units/"gen"/name.change_file_ext(".nim")

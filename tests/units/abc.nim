@@ -21,11 +21,11 @@ type
 
 proc `{}`*(�: type[`blah-Foo`], a: CppInt, b: CppInt): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
-proc recusive_meth*(�: `blah-Foo`, x: ptr `blah-Foo`)
+proc recusive_meth*(�: `blah-Foo`, x: ptr CppConst[`blah-Foo`])
    {.import_cpp: "blah::Foo::recusive_meth(@)", header: "abc.hpp".}
 proc calc*(�: `blah-Foo`, x: CppInt): CppInt
    {.import_cpp: "blah::Foo::calc(@)", header: "abc.hpp".}
-proc `{}`*(�: type[`blah-Foo`], �1: var `blah-Foo`): `blah-Foo`
+proc `{}`*(�: type[`blah-Foo`], �1: var CppConst[`blah-Foo`]): `blah-Foo`
    {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
 proc sum*(a: CppFloat, b: CppFloat): CppFloat
    {.import_cpp: "blah::sum(@)", header: "abc.hpp".}

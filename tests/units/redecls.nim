@@ -14,7 +14,7 @@ type
 
 proc `{}`*(�: type[lexbor_mem_chunk]): lexbor_mem_chunk
    {.import_cpp: "lexbor_mem_chunk::lexbor_mem_chunk(@)", header: "redecls2.hpp".}
-proc `{}`*(�: type[lexbor_mem_chunk], �1: var lexbor_mem_chunk): lexbor_mem_chunk
+proc `{}`*(�: type[lexbor_mem_chunk], �1: var CppConst[lexbor_mem_chunk]): lexbor_mem_chunk
    {.import_cpp: "lexbor_mem_chunk::lexbor_mem_chunk(@)", header: "redecls2.hpp".}
 proc `{}`*(�: type[lexbor_mem_chunk], �1: var lexbor_mem_chunk): lexbor_mem_chunk
    {.import_cpp: "lexbor_mem_chunk::lexbor_mem_chunk(@)", header: "redecls2.hpp".}

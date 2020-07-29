@@ -117,6 +117,8 @@ fn render(const FuncType& type) -> Str {
    return result;
 }
 
+fn render(const ConstType& type) -> Str { return "CppConst[" + render(type.type) + "]"; }
+
 fn render(const Node<Type>& type) -> Str {
    if (is<Node<Sym>>(type)) {
       return render(deref<Node<Sym>>(type));
@@ -134,6 +136,8 @@ fn render(const Node<Type>& type) -> Str {
       return render(deref<ArrayType>(type));
    } else if (is<FuncType>(type)) {
       return render(deref<FuncType>(type));
+   } else if (is<ConstType>(type)) {
+      return render(deref<ConstType>(type));
    } else {
       fatal("unreachable: render(Type)");
    }
@@ -261,6 +265,35 @@ fn render(const MethodDecl& decl) -> Str {
    return result;
 }
 
+fn render(Vec<TemplateParamDecl> formals) -> Str {
+   Str result = "[";
+   for (auto i = 0; i < formals.size(); i += 1) {
+      if (i != 0) {
+         result += ", ";
+      }
+      // auto name = render(formals[i].name());
+      // if (name == "") {
+      //    result += anon_name->latest() + std::to_string(i);
+      // } else {
+      //    result += name;
+      // }
+      // result += ": " + render(formals[i].type());
+   }
+   result += "]";
+   return result;
+}
+
+fn render(const TemplateFunctionDecl& decl) -> Str {
+   auto result = "proc " + render(decl.name) + "*" + render(decl.generics) + render(decl.formals);
+   if (decl.return_type) {
+      result += ": ";
+      result += render(*decl.return_type);
+   }
+   result += "\n" + indent() +
+             render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
+   return result;
+}
+
 fn render(const Node<RoutineDecl>& decl) -> Str {
    if (is<FunctionDecl>(decl)) {
       return render(deref<FunctionDecl>(decl));
@@ -268,6 +301,8 @@ fn render(const Node<RoutineDecl>& decl) -> Str {
       return render(deref<ConstructorDecl>(decl));
    } else if (is<MethodDecl>(decl)) {
       return render(deref<MethodDecl>(decl));
+   } else if (is<TemplateFunctionDecl>(decl)) {
+      return render(deref<TemplateFunctionDecl>(decl));
    } else {
       fatal("unreachable: render(FunctionDecl)");
    }
