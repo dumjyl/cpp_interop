@@ -2,9 +2,9 @@
 #               this is c++20ish, but we target c++17
 
 import private/macro_utils
-from std/os import `/`, parent_dir
-
-const hpp = "ensnare/private/runtime.hpp"
+from std/macros import get_project_path
+import std/os
+export get_project_path, `/`, parent_dir
 
 macro cpp_expr*(T, pattern, args): auto =
    let id = nskProc{"cpp_expr"}
@@ -22,6 +22,8 @@ macro cpp_expr*(T, pattern, args): auto =
                         nnkEmpty{}, nnkEmpty{}}
    result = nnkStmtList{def, call}
 
+const hpp = "ensnare/private/runtime.hpp"
+
 type LaunderClassBuf*[T] {.import_cpp: "ensnare::runtime::LaunderClassBuf<'0>",
                            header: hpp.} = object
 
@@ -37,25 +39,25 @@ proc unsafe_copy[T](this: LaunderClassBuf[T]): LaunderClassBuf[T]
 proc unsafe_deref[T](this: LaunderClassBuf[T]): lent T
    {.import_cpp: "#.unsafe_deref(@)".}
 
-type cpp*[T] = object
+type Cpp*[T] = object
    detail {.export_c.}: LaunderClassBuf[T]
 
-template unsafe_copy*[T](this: cpp[T]): cpp[T] =
+template unsafe_copy*[T](this: Cpp[T]): Cpp[T] =
    ## An implimentation would expose this with `copy` if it is a copyable type.
-   cpp[T](detail: unsafe_copy(this.detail))
+   Cpp[T](detail: unsafe_copy(this.detail))
 
-proc `=destroy`[T](self: var cpp[T]) =
+proc `=destroy`[T](self: var Cpp[T]) =
    unsafe_destroy(self.detail)
 
-proc `=`*[T](dst: var cpp[T], src: cpp[T]) {.error: "use `copy` instead; if available.".}
+proc `=`*[T](dst: var Cpp[T], src: Cpp[T]) {.error: "use `copy` instead; if available.".}
 
-proc `=sink`*[T](dst: var cpp[T], src: cpp[T]) =
+proc `=sink`*[T](dst: var Cpp[T], src: Cpp[T]) =
    unsafe_move(dst.detail, src.detail)
 
-template `{}`*[T](Self: type[cpp[T]], args: varargs[untyped]): cpp[T] =
-   cpp[T](detail: cpp_expr(LaunderClassBuf[T], "'0(@)", args))
+template `{}`*[T](Self: type[Cpp[T]], args: varargs[untyped]): Cpp[T] =
+   Cpp[T](detail: cpp_expr(LaunderClassBuf[T], "'0(@)", args))
 
-template deref*[T](self: cpp[T]): lent T = unsafe_deref(self.detail)
+template deref*[T](self: Cpp[T]): lent T = unsafe_deref(self.detail)
 
 const cstddef_h = "<cstddef>"
 
@@ -95,9 +97,6 @@ type
    CppFloat* {.import_cpp: "float".} = float32
    CppDouble* {.import_cpp: "double".} = float64
    CppLongDouble* {.import_cpp: "long double".} = float64
-   # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#13
-   CppVoid* {.import_cpp: "decltype(void)".} = ptr object
-   # https://timsong-cpp.github.io/cppwp/n4861/basic.fundamental#14, `std::nullptr_t` comes with cstddef.
 
 type # exntensions
    CppInt128* {.import_cpp: "__int128_t".} = int64
@@ -122,6 +121,7 @@ type # <cstddef> types
    # this one is weird. We can maybe determine manually ourselves.
    # cpp_max_align_t* {.import_cpp: "std::max_align_t", header: cstddef_h.} =
    CppByte* {.import_cpp: "std::byte", header: cstddef_h.} = object
+      _: byte
    CppNullPtr* {.import_cpp: "std::nullptr_t", header: cstddef_h.} = type_of(nil)
 
 proc cpp_static_assert*(condition: bool, message: CppCharPtr) {.import_cpp: "static_assert(@)".}
@@ -147,6 +147,9 @@ template cpp_forward_linker*(arg: static[string]) =
 template cpp_include_dir*(dir: static[string]) =
    cpp_forward_compiler("-I" & dir)
 
+template cpp_link_dir*(dir: static[string]) =
+   cpp_forward_linker("-L" & dir)
+
 template cpp_link_lib*(library: static[string]) =
    cpp_forward_linker("-l" & library)
 
@@ -159,15 +162,38 @@ template cpp_compile_src*(src: static[string]) =
    # FIXME(nim): throws IOError instead of error when file does not exist.
    {.compile: src.}
 
-template emit_cpp*(src: static[string]) =
+iterator list_file_rec(dir: string): string =
+   var dirs = @[dir]
+   while dirs.len != 0:
+      let dir = dirs.pop
+      for entry in walk_dir(dir, check_dir=true):
+         case entry.kind:
+         of pc_file: yield entry.path
+         of pc_dir: dirs.add(entry.path)
+         else: discard
+
+macro cpp_compile_src_dir*(dir: static[string]) =
+   ## Compile each `.cpp` file in `dir`. Acts recursively. Does not consider symlinks.
+   result = nnkStmtList{}
+   for file in list_file_rec(if not dir.is_absolute: get_project_path()/dir else: dir):
+      if file.split_file.ext == ".cpp":
+         result.add(!`bind cpp_compile_src`(`file.lit`))
+
+template emit*(src: static[string]) =
    {.emit: src.}
 
-emit_cpp"""
+emit """
 static_assert(__cplusplus >= 201703UL, "c++17 or later is required");
 """
 
 cpp_include_dir(current_source_path().parent_dir.parent_dir)
-cpp_forward_compiler("-std=c++17")
+
+when defined(no_stdcpp):
+   discard
+elif defined(stdcpp20):
+   cpp_forward_compiler("-std=c++20")
+else:
+   cpp_forward_compiler("-std=c++17")
 
 when defined(address_sanitizer):
    cpp_forward_compiler("-fsanitize=address -fno-omit-frame-pointer")
@@ -177,6 +203,7 @@ when defined(undefined_sanitizer):
    cpp_forward_compiler("-fsanitize=undefined")
    cpp_forward_linker("-fsanitize=undefined")
 
-# when defined(memory_sanitizer):
-#    cpp_forward_compiler("-fsanitize=memory")
-#    cpp_forward_linker("-fsanitize=memory")
+when false:
+   when defined(memory_sanitizer):
+      cpp_forward_compiler("-fsanitize=memory")
+      cpp_forward_linker("-fsanitize=memory")

@@ -18,4 +18,4 @@ template request_exit*(code: int, msg: string) =
    raise er
 
 template fatal*(msg: varargs[string, `$`]) =
-   request_exit(1, "fatal-error: " & join(msg))
+   request_exit(1, "fatal error: " & join(msg))

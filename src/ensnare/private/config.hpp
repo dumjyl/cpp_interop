@@ -4,49 +4,46 @@
 #pragma once
 
 #include "ensnare/private/headers.hpp"
-#include "ensnare/private/os_utils.hpp"
 #include "ensnare/private/utils.hpp"
-
-//
-#include "ensnare/private/syn.hpp"
+#include "sugar/os_utils.hpp"
 
 namespace ensnare {
 /// A configuration class responsible for managing command line options.
 class Config {
-   priv Vec<Header> _headers;
-   priv Str _output;
-   priv Vec<Str> _user_clang_args;
-   priv Vec<Str> _include_dirs;
-   priv Vec<Str> _syms;
-   priv Vec<Str> _gensym_types;
-   priv bool _disable_includes;
-   priv bool _fold_type_suffix;
-   priv bool _ignore_const;
+   private:
+   Vec<Header> _headers;
+   Path _output;
+   Vec<Str> _user_clang_args;
+   Vec<Str> _include_dirs;
+   Vec<Str> _syms;
+   Vec<Str> _gensym_types;
+   bool _disable_includes;
+   bool _fold_type_suffix;
+   bool _ignore_const;
 
+   public:
    /// The output location.
    /// It is the first positional argument.
-   pub fn output() const -> const Str&;
+   const Path& output() const;
    /// The headers requested for binding generation.
    /// Controlled by passing header looking things (abc.h, <string>) as positional arguments.
-   pub fn headers() const -> const Vec<Header>&;
+   const Vec<Header>& headers() const;
    /// The user's arguments that will be passed to clang.
    /// These are the postional arguments that are not the output location or a header.
-   pub fn user_clang_args() const -> const Vec<Str>&;
-   pub fn include_dirs() const -> const Vec<Str>&;
+   const Vec<Str>& user_clang_args() const;
+   const Vec<Str>& include_dirs() const;
    /// Specifies specific symbols to bind instead of trying to be smart.
-   pub fn syms() const -> const Vec<Str>&;
-   pub fn gensym_types() const -> const Vec<Str>&;
+   const Vec<Str>& syms() const;
+   const Vec<Str>& gensym_types() const;
    /// If we should try to find some reasonable include search paths from a compiler.
-   pub fn disable_includes() const -> bool;
-   pub fn fold_type_suffix() const -> bool;
-   pub fn ignore_const() const -> bool;
+   bool disable_includes() const;
+   bool fold_type_suffix() const;
+   bool ignore_const() const;
    /// Make a Config from unparsed command line parameters.
-   pub Config(int argc, const char* argv[]);
+   Config(int argc, const char* argv[]);
    /// A header file with all the headers"()" rendered together.
-   pub fn header_file() const -> Str;
+   Str header_file() const;
    /// Dump the config to stdout.
-   pub fn dump() const -> void;
+   void dump() const;
 };
 } // namespace ensnare
-
-#include "ensnare/private/undef_syn.hpp"

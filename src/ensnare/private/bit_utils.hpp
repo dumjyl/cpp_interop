@@ -5,37 +5,34 @@
 #include <limits>
 #include <type_traits>
 
-//
-#include "ensnare/private/syn.hpp"
-
 namespace ensnare {
 namespace detail {
 template <typename T, typename std::enable_if_t<std::is_signed_v<T>, int> = 0>
-constexpr fn signed_bias() -> std::size_t {
+constexpr Size signed_bias() {
    // FIXME: this might be wrong / unoptimized for some enums.
-   return static_cast<std::size_t>(1) << (sizeof(T) * 8 - 1);
+   return static_cast<Size>(1) << (sizeof(T) * 8 - 1);
 }
 
 template <typename T, typename std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
-constexpr fn signed_bias() -> std::size_t {
+constexpr Size signed_bias() {
    return 0;
 }
 
-template <typename T> constexpr fn encode(T val) -> std::size_t {
-   return static_cast<std::size_t>(val) ^ signed_bias<T>();
+template <typename T> constexpr Size encode(T val) {
+   return static_cast<Size>(val) ^ signed_bias<T>();
 }
 
-template <typename T> constexpr fn decode(std::size_t val) -> T {
+template <typename T> constexpr T decode(std::size_t val) {
    return static_cast<T>(val) ^ static_cast<T>(signed_bias<T>());
 }
 
 template <typename T, typename std::enable_if_t<std::numeric_limits<T>::is_integer, int> = 0>
-constexpr fn type_size() -> std::size_t {
+constexpr Size type_size() {
    return encode(std::numeric_limits<T>::max()) - encode(std::numeric_limits<T>::min()) + 1;
 }
 
 template <typename T, typename std::enable_if_t<std::is_enum_v<T>, int> = 0>
-constexpr fn type_size() -> std::size_t {
+constexpr Size type_size() {
    return type_size<std::underlying_type_t<T>>();
 }
 
@@ -45,29 +42,30 @@ template <typename T> using IsBitEncodable = std::enable_if_t<(type_size<T>() < 
 
 /// A simple bit set class.
 template <typename T, typename = detail::IsBitEncodable<T>> class BitSet {
-   priv static constexpr fn array_size() -> std::size_t { return detail::type_size<T>() / 8; }
+   private:
+   static constexpr Size array_size() { return detail::type_size<T>() / 8; }
+   char detail[array_size()];
 
-   priv char detail[array_size()];
+   bool get(Size i) const { return (detail[i / 8] & (1 << (i % 8))) != 0; }
 
-   pub BitSet() {
+   public:
+   BitSet() {
       for (auto i = 0; i < array_size(); i += 1) {
          detail[i] = char(0);
       }
    }
 
    /// Include a value in the bitset.
-   pub fn incl(T val) {
+   void incl(T val) {
       auto i = detail::encode(val);
       detail[i / 8] |= (1 << (i % 8));
    }
 
-   fn get(std::size_t i) const -> bool { return (detail[i / 8] & (1 << (i % 8))) != 0; }
-
    /// Check if val is occupied.
-   pub fn operator[](T val) const -> bool { return get(detail::encode(val)); }
+   bool operator[](T val) const { return get(detail::encode(val)); }
 
    /// Stringify the bitset for debugging.
-   pub fn to_str() -> Str {
+   Str to_string() {
       Str result = "[";
       for (auto i = 0; i < detail::type_size<T>(); i += 1) {
          if (get(i)) {
@@ -84,5 +82,3 @@ template <typename T, typename = detail::IsBitEncodable<T>> class BitSet {
 /// A bit set specialized for encoding `char`.
 using CharSet = BitSet<char>;
 } // namespace ensnare
-
-#include "ensnare/private/undef_syn.hpp"

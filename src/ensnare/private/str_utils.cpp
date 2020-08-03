@@ -2,10 +2,9 @@
 
 #include "ensnare/private/bit_utils.hpp"
 
-//
-#include "ensnare/private/syn.hpp"
+using namespace sugar;
 
-fn ensnare::split_newlines(const Str& str) -> Vec<Str> {
+Vec<Str> ensnare::split_newlines(const Str& str) {
    Vec<Str> result;
    auto last = 0;
    for (auto i = 0; i < str.size(); i += 1) {
@@ -25,7 +24,7 @@ fn ensnare::split_newlines(const Str& str) -> Vec<Str> {
    return result;
 }
 
-fn ensnare::ends_with(const Str& self, const Str& suffix) -> bool {
+bool ensnare::ends_with(const Str& self, const Str& suffix) {
    if (suffix.size() > self.size()) {
       return false;
    } else {
@@ -38,7 +37,7 @@ fn ensnare::ends_with(const Str& self, const Str& suffix) -> bool {
    }
 }
 
-fn is_find_str(const char* data, std::size_t data_size, const ensnare::Str& find) -> bool {
+bool is_find_str(const char* data, Size data_size, const Str& find) {
    if (data_size >= find.size()) {
       for (auto i = 0; i < find.size(); i += 1) {
          if (data[i] != find[i]) {
@@ -51,7 +50,7 @@ fn is_find_str(const char* data, std::size_t data_size, const ensnare::Str& find
    }
 }
 
-fn ensnare::replace(const Str& str, const Str& find, const Str& replace) -> Str {
+Str ensnare::replace(const Str& str, const Str& find, const Str& replace) {
    Str result;
    std::size_t i = 0;
    while (i < str.size()) {
@@ -66,13 +65,13 @@ fn ensnare::replace(const Str& str, const Str& find, const Str& replace) -> Str 
    return result;
 }
 
-fn incl(ensnare::CharSet& chars, char low, char high) {
+void incl(ensnare::CharSet& chars, char low, char high) {
    for (auto i = static_cast<std::size_t>(low); i <= high; i += 1) {
       chars.incl(static_cast<char>(i));
    }
 }
 
-fn ident_chars() -> ensnare::CharSet {
+ensnare::CharSet ident_chars() {
    ensnare::CharSet result;
    incl(result, 'A', 'Z');
    incl(result, 'a', 'z');
@@ -81,7 +80,7 @@ fn ident_chars() -> ensnare::CharSet {
    return result;
 }
 
-fn ensnare::is_ident_chars(const Str& str) -> bool {
+bool ensnare::is_ident_chars(const Str& str) {
    for (auto c : str) {
       if (!ident_chars()[c]) {
          return false;
@@ -89,5 +88,3 @@ fn ensnare::is_ident_chars(const Str& str) -> bool {
    }
    return true;
 }
-
-#include "ensnare/private/undef_syn.hpp"

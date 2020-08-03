@@ -1,13 +1,10 @@
 import ensnare/runtime, ensnare/private/build
 from std/os import `/`
 
-cpp_compile_src("ensnare"/"private"/"os_utils.cpp")
-cpp_compile_src("ensnare"/"private"/"str_utils.cpp")
-cpp_compile_src("ensnare"/"private"/"headers.cpp")
-cpp_compile_src("ensnare"/"private"/"ir.cpp")
-cpp_compile_src("ensnare"/"private"/"config.cpp")
-cpp_compile_src("ensnare"/"private"/"render.cpp")
-cpp_compile_src("ensnare"/"private"/"main.cpp")
+const deps = get_project_path().parent_dir/"deps"
+cpp_include_dir(deps/"sugar"/"include")
+cpp_compile_src_dir(deps/"sugar"/"src")
+cpp_compile_src_dir("ensnare"/"private")
 build.flags()
 
 proc run(argc: CppInt, argv: CppUnsizedArray[CppCharPtr])

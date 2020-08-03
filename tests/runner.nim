@@ -8,8 +8,6 @@ proc nim_gen_file(name: string): string = units/"gen"/name.change_file_ext(".nim
 
 proc nim_test_file(name: string): string = units/name.change_file_ext(".nim")
 
-proc hpp_test_file(name: string): string = units/name.change_file_ext(".hpp")
-
 proc invoke(name: string): (string, int) =
    result = exec("bin/ensnare", ["-include-dir=" & units, nim_gen_file(name), "-I" & units,
                                  name.change_file_ext(".hpp")])

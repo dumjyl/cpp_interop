@@ -1,8 +1,8 @@
 /// \file
 /// All of the types that are not Unions appear inside a `Node<_>` or a `Node<Union<_>>`
 ///
-/// This is a symbolized IR. Prudence must be taken to not produce distinct nodes for the same
-/// entity.
+/// This is a symbolized IR. Care must be taken to not produce multiple nodes for the same
+/// symbolic entity.
 
 #pragma once
 
@@ -10,18 +10,34 @@
 
 #include <cstdint>
 
-//
-#include "ensnare/private/syn.hpp"
-
 namespace ensnare {
 /// This is reference counted string class with a history. Should be stored within a node.
 class Sym {
-   priv Vec<Str> detail;
-   priv bool _no_stropping; ///< This symbol does not require stropping even if it is a keyword.
-   pub Sym(Str name, bool no_stropping = false);
-   pub void update(Str name);
-   pub fn latest() const -> Str;
-   pub fn no_stropping() const -> bool;
+   private:
+   Vec<Str> detail;
+   bool _no_stropping; ///< This symbol does not require stropping even if it is a keyword.
+   public:
+   Sym(Str name, bool no_stropping = false);
+   void update(Str name);
+   Str latest() const;
+   bool no_stropping() const;
+};
+
+template <typename T> class LitExpr;
+class ConstParamExpr;
+
+using Expr = Union<LitExpr<U64>, LitExpr<I64>, ConstParamExpr>;
+
+template <typename T> class LitExpr {
+   public:
+   const T value;
+   LitExpr(T value) : value(value) {}
+};
+
+class ConstParamExpr {
+   public:
+   const Node<Sym> name;
+   ConstParamExpr(Node<Sym> name);
 };
 
 class PtrType;
@@ -39,160 +55,222 @@ using Type = Union<Node<Sym>, PtrType, RefType, OpaqueType, InstType, UnsizedArr
 
 /// Just a raw pointer.
 class PtrType {
-   pub const Node<Type> pointee;
-   pub PtrType(Node<Type> pointee);
+   public:
+   const Node<Type> pointee;
+   PtrType(Node<Type> pointee);
 };
 
 /// A c++ reference pointer.
 class RefType {
-   pub const Node<Type> pointee;
-   pub RefType(Node<Type> pointee);
+   public:
+   const Node<Type> pointee;
+   RefType(Node<Type> pointee);
 };
 
 class OpaqueType {};
 
 class InstType {
-   pub const Node<Sym> name;
-   pub const Vec<Node<Type>> types;
-   pub InstType(Node<Sym> name, Vec<Node<Type>> types);
+   public:
+   const Node<Sym> name;
+   const Vec<Node<Type>> types;
+   InstType(Node<Sym> name, Vec<Node<Type>> types);
 };
 
 class UnsizedArrayType {
-   pub const Node<Type> type;
-   pub UnsizedArrayType(Node<Type> type);
+   public:
+   const Node<Type> type;
+   UnsizedArrayType(Node<Type> type);
 };
 
 class ArrayType {
-   pub const std::uint64_t size;
-   pub const Node<Type> type;
-   pub ArrayType(std::uint64_t size, Node<Type> type);
+   public:
+   const Node<Expr> size;
+   const Node<Type> type;
+   ArrayType(Node<Expr> size, Node<Type> type);
 };
 
 class FuncType {
-   pub const Vec<Node<Type>> formals;
-   pub const Node<Type> return_type;
-   pub FuncType(Vec<Node<Type>> formals, Node<Type> return_type);
+   public:
+   const Vec<Node<Type>> formals;
+   const Node<Type> return_type;
+   FuncType(Vec<Node<Type>> formals, Node<Type> return_type);
 };
 
 class ConstType {
-   pub const Node<Type> type;
-   pub ConstType(Node<Type> type);
+   public:
+   const Node<Type> type;
+   ConstType(Node<Type> type);
 };
 
 /// A `type Foo = Bar[X, Y]` like declaration.
 /// These come from c++ declarations like `using Foo = Bar[X, Y];` or `typedef Bar[X, Y] Foo;`
 class AliasTypeDecl {
-   pub const Node<Sym> name;
-   pub const Node<Type> type;
-   pub AliasTypeDecl(Str name, Node<Type> type);
-   pub AliasTypeDecl(Node<Sym> name, Node<Type> type);
+   public:
+   const Node<Sym> name;
+   const Node<Type> type;
+   AliasTypeDecl(Str name, Node<Type> type);
+   AliasTypeDecl(Node<Sym> name, Node<Type> type);
 };
 
 /// An enum field declation.
 class EnumFieldDecl {
-   pub const Node<Sym> name;
-   pub const Opt<std::int64_t> val;
-   pub EnumFieldDecl(Str name);
-   pub EnumFieldDecl(Str name, std::int64_t val);
+   public:
+   const Node<Sym> name;
+   const Opt<std::int64_t> val;
+   EnumFieldDecl(Str name);
+   EnumFieldDecl(Str name, std::int64_t val);
 };
 
 /// A c++ enum of some kind. It may not be mapped as a nim enum.
 class EnumTypeDecl {
-   pub const Node<Sym> name;
-   pub const Str cpp_name;
-   pub const Str header;
-   pub const Vec<EnumFieldDecl> fields;
-   pub EnumTypeDecl(Str name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields);
-   pub EnumTypeDecl(Node<Sym> name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields);
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Vec<EnumFieldDecl> fields;
+   EnumTypeDecl(Str name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields);
+   EnumTypeDecl(Node<Sym> name, Str cpp_name, Str header, Vec<EnumFieldDecl> fields);
 };
 
 class RecordFieldDecl {
-   pub const Node<Sym> name;
-   pub const Node<Type> type;
-   pub RecordFieldDecl(Str name, Node<Type> type);
+   public:
+   const Node<Sym> name;
+   const Node<Type> type;
+   RecordFieldDecl(Str name, Node<Type> type);
 };
 
 /// A `struct` / `class` / `union` type declaration.
 class RecordTypeDecl {
-   pub const Node<Sym> name;
-   pub const Str cpp_name;
-   pub const Str header;
-   pub const Vec<RecordFieldDecl> fields;
-   pub RecordTypeDecl(Str name, Str cpp_name, Str header, Vec<RecordFieldDecl> fields);
-   pub RecordTypeDecl(Node<Sym> name, Str cpp_name, Str header, Vec<RecordFieldDecl> fields);
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Vec<RecordFieldDecl> fields;
+   RecordTypeDecl(Str name, Str cpp_name, Str header, Vec<RecordFieldDecl> fields);
+   RecordTypeDecl(Node<Sym> name, Str cpp_name, Str header, Vec<RecordFieldDecl> fields);
+};
+
+class TemplateParamDecl {
+   public:
+   const Node<Sym> name;
+   const Opt<Node<Type>> constraint;
+   TemplateParamDecl(Node<Sym> name);
+   TemplateParamDecl(Node<Sym> name, Node<Type> constraint);
+};
+
+/// A `struct` / `class` / `union` type declaration.
+class TemplateRecordTypeDecl {
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Vec<Node<TemplateParamDecl>> generics;
+   const Vec<RecordFieldDecl> fields;
+   TemplateRecordTypeDecl(Node<Sym> name, Str cpp_name, Str header,
+                          Vec<Node<TemplateParamDecl>> generics, Vec<RecordFieldDecl> fields);
 };
 
 /// Some kind of type declaration. Should be stored within a Node.
-using TypeDecl = Union<AliasTypeDecl, EnumTypeDecl, RecordTypeDecl>;
+using TypeDecl = Union<AliasTypeDecl, EnumTypeDecl, RecordTypeDecl, TemplateRecordTypeDecl>;
 
-fn name(Node<TypeDecl> decl) -> Sym&;
+Sym& name(Node<TypeDecl> decl);
 
 /// A routine parameter declaration.
 class ParamDecl {
-   priv Node<Sym> _name;
-   priv Node<Type> _type;
-   pub fn name() const -> Node<Sym>;
-   pub fn type() const -> Node<Type>;
-   pub ParamDecl(Str name, Node<Type> type);
-   pub ParamDecl(Node<Sym> name, Node<Type> type);
-};
+   private:
+   Node<Sym> _name;
+   Node<Type> _type;
 
-class TemplateParamDecl {};
+   public:
+   Node<Sym> name() const;
+   Node<Type> type() const;
+   ParamDecl(Str name, Node<Type> type);
+   ParamDecl(Node<Sym> name, Node<Type> type);
+};
 
 /// A non method function declaration.
 class FunctionDecl {
-   pub const Node<Sym> name;
-   pub const Str cpp_name;
-   pub const Str header;
-   pub const Vec<ParamDecl> formals;
-   pub const Opt<Node<Type>> return_type;
-   pub FunctionDecl(Str name, Str cpp_name, Str header, Vec<ParamDecl> formals,
-                    Opt<Node<Type>> return_type);
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Vec<ParamDecl> formals;
+   const Opt<Node<Type>> return_type;
+   FunctionDecl(Str name, Str cpp_name, Str header, Vec<ParamDecl> formals,
+                Opt<Node<Type>> return_type);
 };
 
 /// A c++ class/struct/union constructor.
 class ConstructorDecl {
-   pub const Str cpp_name;
-   pub const Str header;
-   pub const Node<Type> self;
-   pub const Vec<ParamDecl> formals;
-   pub ConstructorDecl(Str cpp_name, Str header, Node<Type> self, Vec<ParamDecl> formals);
+   public:
+   const Str cpp_name;
+   const Str header;
+   const Node<Type> self;
+   const Vec<ParamDecl> formals;
+   ConstructorDecl(Str cpp_name, Str header, Node<Type> self, Vec<ParamDecl> formals);
 };
 
 /// A c++ class/struct/union method.
 class MethodDecl {
-   pub const Node<Sym> name;
-   pub const Str cpp_name;
-   pub const Str header;
-   pub const Node<Type> self;
-   pub const Vec<ParamDecl> formals;
-   pub const Opt<Node<Type>> return_type;
-   pub MethodDecl(Str name, Str cpp_name, Str header, Node<Type> self, Vec<ParamDecl> formals,
-                  Opt<Node<Type>> return_type);
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Node<Type> self;
+   const Vec<ParamDecl> formals;
+   const Opt<Node<Type>> return_type;
+   MethodDecl(Str name, Str cpp_name, Str header, Node<Type> self, Vec<ParamDecl> formals,
+              Opt<Node<Type>> return_type);
 };
 
 class TemplateFunctionDecl {
-   pub const Node<Sym> name;
-   pub const Str cpp_name;
-   pub const Str header;
-   pub const Vec<TemplateParamDecl> generics;
-   pub const Vec<ParamDecl> formals;
-   pub const Opt<Node<Type>> return_type;
-   pub TemplateFunctionDecl(Str name, Str cpp_name, Str header, Vec<TemplateParamDecl> generics,
-                            Vec<ParamDecl> formals, Opt<Node<Type>> return_type);
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Vec<Node<TemplateParamDecl>> generics;
+   const Vec<ParamDecl> formals;
+   const Opt<Node<Type>> return_type;
+   TemplateFunctionDecl(Str name, Str cpp_name, Str header, Vec<Node<TemplateParamDecl>> generics,
+                        Vec<ParamDecl> formals, Opt<Node<Type>> return_type);
+};
+
+class TemplateConstructorDecl {
+   public:
+   const Str cpp_name;
+   const Str header;
+   const Node<Type> self;
+   const Vec<Node<TemplateParamDecl>> generics;
+   const Vec<ParamDecl> formals;
+   TemplateConstructorDecl(Str cpp_name, Str header, Node<Type> self,
+                           Vec<Node<TemplateParamDecl>> generics, Vec<ParamDecl> formals);
+};
+
+class TemplateMethodDecl {
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Node<Type> self;
+   const Vec<Node<TemplateParamDecl>> generics;
+   const Vec<ParamDecl> formals;
+   const Opt<Node<Type>> return_type;
+   TemplateMethodDecl(Str name, Str cpp_name, Str header, Node<Type> self,
+                      Vec<Node<TemplateParamDecl>> generics, Vec<ParamDecl> formals,
+                      Opt<Node<Type>> return_type);
 };
 
 /// Some kind of routine declaration. Should be stored within a Node.
-using RoutineDecl = Union<FunctionDecl, ConstructorDecl, MethodDecl, TemplateFunctionDecl>;
+using RoutineDecl = Union<FunctionDecl, ConstructorDecl, MethodDecl, TemplateFunctionDecl,
+                          TemplateConstructorDecl, TemplateMethodDecl>;
 
 /// A variable declaration.
 class VariableDecl {
-   pub const Node<Sym> name;
-   pub const Str cpp_name;
-   pub const Str header;
-   pub const Node<Type> type;
-   pub VariableDecl(Str name, Str cpp_name, Str header, Node<Type> type);
+   public:
+   const Node<Sym> name;
+   const Str cpp_name;
+   const Str header;
+   const Node<Type> type;
+   VariableDecl(Str name, Str cpp_name, Str header, Node<Type> type);
 };
 } // namespace ensnare
-
-#include "ensnare/private/undef_syn.hpp"

@@ -2,9 +2,6 @@
 
 #include "llvm/Support/CommandLine.h"
 
-//
-#include "ensnare/private/syn.hpp"
-
 namespace cl = llvm::cl;
 using namespace ensnare;
 cl::list<Str> syms("sym", cl::desc("specify specific symbols to bind. FIXME: not implimented"));
@@ -18,15 +15,15 @@ cl::opt<bool> ignore_const("ignore-const", cl::desc("ignore const qualifiers"));
 cl::opt<Str> output(cl::Positional, cl::desc("output wrapper name/path"));
 cl::list<Str> args(cl::ConsumeAfter, cl::desc("clang args..."));
 
-fn ensnare::Config::headers() const -> const Vec<Header>& { return _headers; }
-fn ensnare::Config::output() const -> const Str& { return _output; }
-fn ensnare::Config::user_clang_args() const -> const Vec<Str>& { return _user_clang_args; }
-fn ensnare::Config::syms() const -> const Vec<Str>& { return _syms; }
-fn ensnare::Config::gensym_types() const -> const Vec<Str>& { return _gensym_types; }
-fn ensnare::Config::include_dirs() const -> const Vec<Str>& { return _include_dirs; }
-fn ensnare::Config::disable_includes() const -> bool { return _disable_includes; }
-fn ensnare::Config::fold_type_suffix() const -> bool { return _fold_type_suffix; }
-fn ensnare::Config::ignore_const() const -> bool { return _ignore_const; }
+const Vec<Header>& ensnare::Config::headers() const { return _headers; }
+const Path& ensnare::Config::output() const { return _output; }
+const Vec<Str>& ensnare::Config::user_clang_args() const { return _user_clang_args; }
+const Vec<Str>& ensnare::Config::syms() const { return _syms; }
+const Vec<Str>& ensnare::Config::gensym_types() const { return _gensym_types; }
+const Vec<Str>& ensnare::Config::include_dirs() const { return _include_dirs; }
+bool ensnare::Config::disable_includes() const { return _disable_includes; }
+bool ensnare::Config::fold_type_suffix() const { return _fold_type_suffix; }
+bool ensnare::Config::ignore_const() const { return _ignore_const; }
 
 ensnare::Config::Config(int argc, const char* argv[]) {
    llvm::cl::ParseCommandLineOptions(argc, argv);
@@ -36,7 +33,7 @@ ensnare::Config::Config(int argc, const char* argv[]) {
    _fold_type_suffix = ::fold_type_suffix;
    _disable_includes = ::disable_includes;
    _ignore_const = ::ignore_const;
-   _output = ::output;
+   _output = Str(::output);
    for (const auto& arg : args) {
       auto header = Header::parse(arg);
       if (header) {
@@ -47,7 +44,7 @@ ensnare::Config::Config(int argc, const char* argv[]) {
    }
 };
 
-fn ensnare::Config::header_file() const -> Str {
+Str ensnare::Config::header_file() const {
    if (_headers.size() == 0) {
       fatal("no headers given");
    } else {
@@ -59,7 +56,7 @@ fn ensnare::Config::header_file() const -> Str {
    };
 }
 
-fn ensnare::Config::dump() const -> void {
+void ensnare::Config::dump() const {
    print("Config:");
    print("   output: ", _output);
    for (const auto& header : _headers) {
@@ -72,5 +69,3 @@ fn ensnare::Config::dump() const -> void {
       print("   sym: ", sym);
    }
 }
-
-#include "ensnare/private/undef_syn.hpp"
