@@ -23,8 +23,7 @@
 /// Care must be taken to not produce multiple symbols for the same declaration.
 ///
 /// ### Visiting
-/// Our visitor is responsible for instiating a clang::ASTUnit and a Context.
-/// We bind or discard on _every_ clang::Decl wihnin our translation unit.
+/// We bind or discard _every_ clang::Decl wihnin a translation unit
 ///
 /// ### Binding
 /// The core binding code consists of some basic operations.
@@ -44,7 +43,7 @@
 /// - A target system for cross compilation and arch specific features/builtins.
 ///   Cross compilation is already exposed with `--disable-include-search-paths` and clang's
 ///   `--target`.
-/// - clang offers some PP information that should be exposed as constants and templates.
+/// - clang offers some PP information that could be exposed as constants and templates.
 
 #pragma once
 

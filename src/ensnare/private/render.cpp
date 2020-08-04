@@ -7,8 +7,8 @@
 #include <cstdint>
 
 namespace ensnare {
-const std::size_t indent_size = 3;
-const Node<Sym> anon_name = node<Sym>("�", true);
+const Size indent_size = 3;
+const Sym anon_name = new_Sym("�", true);
 
 Str indent() {
    Str result;
@@ -26,7 +26,7 @@ Str indent(const Str& str) {
    return result;
 }
 
-Str render(const Node<Type>& type);
+Str render(Type type);
 
 const llvm::StringSet nim_keywords(
     {"nil",       "addr",     "asm",      "bind",    "mixin",     "block",    "do",     "break",
@@ -39,7 +39,7 @@ const llvm::StringSet nim_keywords(
      "ptr",       "ref",      "distinct", "concept", "static",    "type",     "using",  "const",
      "let",       "var"});
 
-Str render(const Node<Sym> sym) {
+Str render(const Sym sym) {
    auto latest = sym->latest();
    auto is_keyword = nim_keywords.count(latest) != 0;
    auto non_ident_char = !is_ident_chars(latest);
@@ -73,7 +73,7 @@ Str render(const Node<Sym> sym) {
    }
 }
 
-Str render(Node<Expr> expr) {
+Str render(Expr expr) {
    if (is<LitExpr<U64>>(expr)) {
       return std::to_string(as<LitExpr<U64>>(expr).value);
    } else if (is<LitExpr<I64>>(expr)) {
@@ -113,12 +113,12 @@ Str render(const ArrayType& type) {
 
 Str render(const FuncType& type) {
    Str result = "proc (";
-   for (auto i = 0; i < type.formals.size(); i += 1) {
+   for (auto i = 0; i < type.params.size(); i += 1) {
       if (i != 0) {
          result += ", ";
       }
       result += anon_name->latest() + std::to_string(i);
-      result += ": " + render(type.formals[i]);
+      result += ": " + render(type.params[i]);
    }
    result += "): " + render(type.return_type);
    return result;
@@ -126,9 +126,9 @@ Str render(const FuncType& type) {
 
 Str render(const ConstType& type) { return "CppConst[" + render(type.type) + "]"; }
 
-Str render(const Node<Type>& type) {
-   if (is<Node<Sym>>(type)) {
-      return render(as<Node<Sym>>(type));
+Str render(Type type) {
+   if (is<Sym>(type)) {
+      return render(as<Sym>(type));
    } else if (is<PtrType>(type)) {
       return render(as<PtrType>(type));
    } else if (is<RefType>(type)) {
@@ -202,7 +202,7 @@ Str render(const RecordTypeDecl& decl) {
    return result;
 }
 
-Str render(const TemplateParamDecl& param) {
+Str render(const TemplateParam& param) {
    Str result = render(param.name);
    if (param.constraint) {
       result += ": " + render(*param.constraint);
@@ -210,71 +210,60 @@ Str render(const TemplateParamDecl& param) {
    return result;
 }
 
-Str render(Vec<Node<TemplateParamDecl>> generics) {
+Str render(const TemplateParams& params) {
    Str result = "[";
-   for (auto i = 0; i < generics.size(); i += 1) {
+   for (auto i = 0; i < params.size(); i += 1) {
       if (i != 0) {
          result += "; ";
       }
-      result += render(*generics[i]);
+      result += render(*params[i]);
    }
    result += "]";
    return result;
 }
 
-Str render(const TemplateRecordTypeDecl& decl) {
-   Str result = render(decl.name) + "* " + render(decl.generics) + " " +
-                render_pragmas({import_cpp(decl.cpp_name), header(decl.header)}) + " = object\n";
-   for (const auto& field : decl.fields) {
-      result += render(field);
-   }
-   return result;
-}
-
-Str render(const Node<TypeDecl>& decl) {
+Str render(TypeDecl decl) {
    if (is<AliasTypeDecl>(decl)) {
       return render(as<AliasTypeDecl>(decl));
    } else if (is<EnumTypeDecl>(decl)) {
       return render(as<EnumTypeDecl>(decl));
    } else if (is<RecordTypeDecl>(decl)) {
       return render(as<RecordTypeDecl>(decl));
-   } else if (is<TemplateRecordTypeDecl>(decl)) {
-      return render(as<TemplateRecordTypeDecl>(decl));
    } else {
       fatal("unreachable: render(TypeDecl)");
    }
 }
 
-template <typename T> ParamDecl self_param(const T& decl) {
-   return ParamDecl(anon_name, node<Type>(InstType(node<Sym>("type", true), {decl.self})));
+template <typename T> Param self_param(const T& decl) {
+   return Param(anon_name, new_Type(InstType(new_Sym("type", true), {decl.self})));
 }
 
-Str render(const Vec<ParamDecl>& formals) {
+Str render(const Params& params) {
    Str result = "(";
-   for (auto i = 0; i < formals.size(); i += 1) {
+   for (auto i = 0; i < params.size(); i += 1) {
       if (i != 0) {
          result += ", ";
       }
-      auto name = render(formals[i].name());
+      auto name = render(params[i].name());
       if (name == "") {
          result += anon_name->latest() + std::to_string(i);
       } else {
          result += name;
       }
-      result += ": " + render(formals[i].type());
+      result += ": " + render(params[i].type());
    }
    result += ")";
    return result;
 }
 
-Str render(ParamDecl first_formal, Vec<ParamDecl> formals) {
-   Vec<ParamDecl> tmp = {first_formal};
-   tmp.insert(tmp.end(), formals.begin(), formals.end());
+Str render(Param first_param, Params params) {
+   Params tmp = {first_param};
+   tmp.insert(tmp.end(), params.begin(), params.end());
    return render(tmp);
 }
 
 Str render(const FunctionDecl& decl) {
-   auto result = "proc " + render(decl.name) + "*" + render(decl.formals);
+   auto result = "proc " + render(decl.name) + "*" + render(decl.params);
    if (decl.return_type) {
       result += ": ";
       result += render(*decl.return_type);
@@ -285,7 +274,7 @@ Str render(const FunctionDecl& decl) {
 }
 
 Str render(const ConstructorDecl& decl) {
-   Str result = "proc `{}`*" + render(self_param(decl), decl.formals) + ": " + render(decl.self) +
+   Str result = "proc `{}`*" + render(self_param(decl), decl.params) + ": " + render(decl.self) +
                 "\n" + indent() +
                 render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
    return result;
@@ -293,7 +282,7 @@ Str render(const ConstructorDecl& decl) {
 
 Str render(const MethodDecl& decl) {
    Str result =
-       "proc " + render(decl.name) + "*" + render(ParamDecl(anon_name, decl.self), decl.formals);
+       "proc " + render(decl.name) + "*" + render(Param(anon_name, decl.self), decl.params);
    if (decl.return_type) {
       result += ": ";
       result += render(*decl.return_type);
@@ -303,61 +292,25 @@ Str render(const MethodDecl& decl) {
    return result;
 }
 
-Str render(const TemplateFunctionDecl& decl) {
-   auto result = "proc " + render(decl.name) + "*" + render(decl.generics) + render(decl.formals);
-   if (decl.return_type) {
-      result += ": ";
-      result += render(*decl.return_type);
-   }
-   result += "\n" + indent() +
-             render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
-   return result;
-}
-
-Str render(const TemplateConstructorDecl& decl) {
-   Str result = "proc `{}`*" + render(decl.generics) + render(self_param(decl), decl.formals) +
-                ": " + render(decl.self) + "\n" + indent() +
-                render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
-   return result;
-}
-
-Str render(const TemplateMethodDecl& decl) {
-   Str result = "proc " + render(decl.name) + "*" + render(decl.generics) +
-                render(ParamDecl(anon_name, decl.self), decl.formals);
-   if (decl.return_type) {
-      result += ": ";
-      result += render(*decl.return_type);
-   }
-   result += "\n" + indent() +
-             render_pragmas({import_cpp(decl.cpp_name + "(@)"), header(decl.header)}) + "\n";
-   return result;
-}
-
-Str render(const Node<RoutineDecl>& decl) {
+Str render(const RoutineDecl& decl) {
    if (is<FunctionDecl>(decl)) {
       return render(as<FunctionDecl>(decl));
    } else if (is<ConstructorDecl>(decl)) {
       return render(as<ConstructorDecl>(decl));
    } else if (is<MethodDecl>(decl)) {
       return render(as<MethodDecl>(decl));
-   } else if (is<TemplateFunctionDecl>(decl)) {
-      return render(as<TemplateFunctionDecl>(decl));
-   } else if (is<TemplateConstructorDecl>(decl)) {
-      return render(as<TemplateConstructorDecl>(decl));
-   } else if (is<TemplateMethodDecl>(decl)) {
-      return render(as<TemplateMethodDecl>(decl));
    } else {
       fatal("unreachable: render(FunctionDecl)");
    }
 }
 
-Str render(const Node<VariableDecl>& decl) {
+Str render(const VariableDecl& decl) {
    return render(decl->name) + "* " +
           render_pragmas({import_cpp(decl->cpp_name), header(decl->header)}) + ": " +
           render(decl->type) + "\n";
 }
 
-Str render(const Vec<Node<TypeDecl>>& decls) {
+Str render(const Vec<TypeDecl>& decls) {
    if (decls.size() == 0) {
       return "";
    } else {
@@ -369,7 +322,7 @@ Str render(const Vec<Node<TypeDecl>>& decls) {
    }
 }
 
-Str render(const Vec<Node<RoutineDecl>>& decls) {
+Str render(const Vec<RoutineDecl>& decls) {
    if (decls.size() == 0) {
       return "";
    } else {
@@ -381,7 +334,7 @@ Str render(const Vec<Node<RoutineDecl>>& decls) {
    }
 }
 
-Str render(const Vec<Node<VariableDecl>>& decls) {
+Str render(const Vec<VariableDecl>& decls) {
    if (decls.size() == 0) {
       return "";
    } else {

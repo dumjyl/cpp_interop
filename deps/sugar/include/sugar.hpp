@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <optional>
@@ -70,10 +71,10 @@ template <typename T> using Opt = std::optional<T>;
 
 /// Extract the value from `self` or exit fatally with `msg`.
 template <typename T, typename... Msgs> T expect(Opt<T> self, Msgs... msgs) {
-   require(self, "failed to unpack a none variant; ", msgs...);
+   require(bool(self), "failed to unpack a none variant; ", msgs...);
 }
 
-/// Check if a `self` is of variant/type `T`. If it is, it safely be read like: `deref<T>(self)`.
+/// Check if a `self` is of variant/type `T`. If it is, it safely be read like: `as<T>(self)`.
 template <typename T, typename... Variants> bool is(const Union<Variants...>& self) {
    return std::holds_alternative<T, Variants...>(self);
 }
