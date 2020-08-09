@@ -1,0 +1,27 @@
+From 5f209308833ecc545d1d3c852292acc0e62be3bd Mon Sep 17 00:00:00 2001
+From: Jasper Jenkins <jasper.vs.jenkins@gmail.com>
+Date: Sat, 8 Aug 2020 11:07:27 -0700
+Subject: [PATCH] importcpp unsigned static param fix
+
+---
+ compiler/ccgtypes.nim | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/compiler/ccgtypes.nim b/compiler/ccgtypes.nim
+index f1dc85818..0d02bf646 100644
+--- a/compiler/ccgtypes.nim
++++ b/compiler/ccgtypes.nim
+@@ -838,7 +838,9 @@ proc getTypeDescAux(m: BModule, origTyp: PType, check: var IntSet): Rope =
+           result.add(~"void")
+         elif ty.kind == tyStatic:
+           internalAssert m.config, ty.n != nil
+-          result.add ty.n.renderTree
++          case ty.n.kind:
++          of nkUIntLit .. nkUInt64Lit: result.add($BiggestUInt(ty.n.intVal) & 'u')
++          else: result.add(ty.n.renderTree)
+         else:
+           result.add getTypeDescAux(m, ty, check)
+ 
+-- 
+2.17.1
+

@@ -4,40 +4,38 @@ from std/os import `/`
 from std/macros import error
 from std/strutils import strip_line_end, starts_with
 
-const
-   clang_libs* = [
-      "clangTooling",
-      "clangDriver",
-      "clangFrontend",
-      "clangSerialization",
-      "clangParse",
-      "clangSema",
-      "clangEdit",
-      "clangAnalysis",
-      "clangAST",
-      "clangLex",
-      "clangBasic"]
-   llvm_libs* = [
-      "LLVMMCParser",
-      "LLVMMC",
-      "LLVMDebugInfoCodeView",
-      "LLVMDebugInfoMSF",
-      "LLVMBitstreamReader",
-      "LLVMFrontendOpenMP",
-      "LLVMProfileData",
-      "LLVMCore",
-      "LLVMRemarks",
-      "LLVMOption",
-      "LLVMBinaryFormat",
-      "LLVMSupport",
-      "LLVMDemangle"]
+const libs* = [
+   "clangTooling",
+   "clangFrontend",
+   "clangDriver",
+   "clangSerialization",
+   "clangParse",
+   "clangSema",
+   "clangEdit",
+   "clangAnalysis",
+   "clangAST",
+   "clangLex",
+   "clangBasic",
+   "LLVMMCParser",
+   "LLVMMC",
+   "LLVMDebugInfoCodeView",
+   "LLVMDebugInfoMSF",
+   "LLVMBitstreamReader",
+   "LLVMFrontendOpenMP",
+   "LLVMProfileData",
+   "LLVMCore",
+   "LLVMRemarks",
+   "LLVMOption",
+   "LLVMBinaryFormat",
+   "LLVMSupport",
+   "LLVMDemangle"]
 
 proc valid_config(exe: string): bool =
    var (output, code) = gorge_ex(exe & " --version")
    output.strip_line_end
    result = code == 0 and output.starts_with("10.0.")
 
-proc find_config(arg: string): string =
+proc find_config(): string =
    if valid_config("clang-tooling-config"):
       result = "clang-tooling-config"
    elif valid_config("llvm-config"):
@@ -45,8 +43,7 @@ proc find_config(arg: string): string =
    else:
       error("failed to find valid llvm-config")
 
-proc config(arg: string): string =
-   var exe = find_config(arg)
+proc config(exe: string, arg: string): string =
    let (output, code) = gorge_ex(exe & " --" & arg)
    if code != 0 or output.len == 0:
       if output.len == 0:
@@ -57,25 +54,25 @@ proc config(arg: string): string =
       result = output
       result.strip_line_end
 
-const deps = get_project_path().parent_dir/"deps"
+const
+   deps = get_project_path().parent_dir/"deps"
+   exe = find_config()
+
 cpp_include_dir(deps/"sugar"/"include")
 cpp_compile_src_dir(deps/"sugar"/"src")
 cpp_compile_src_dir("ensnare"/"private")
-
-cpp_include_dir(config("includedir"))
-cpp_forward_compiler("-fno-rtti")
-cpp_forward_compiler("-D_GNU_SOURCE")
-cpp_forward_compiler("-D__STDC_CONSTANT_MACROS")
-cpp_forward_compiler("-D__STDC_FORMAT_MACROS")
-cpp_forward_compiler("-D__STDC_LIMIT_MACROS")
-cpp_link_lib(@clang_libs & @llvm_libs)
-cpp_link_lib("omptarget")
+cpp_forward_compiler(exe.config("cxxflags") & " -std=c++17 -fexceptions")
+cpp_forward_linker(exe.config("ldflags"))
+cpp_link_lib(libs)
 cpp_link_lib("stdc++fs")
 when defined(windows):
    cpp_link_lib("shlwapi")
    cpp_link_lib("version")
-cpp_forward_linker(config("ldflags"))
-cpp_forward_linker(config("system-libs"))
+when defined(docker_alpine):
+   cpp_link_lib("z")
+   cpp_forward_linker("-static")
+else:
+   cpp_forward_linker(exe.config("system-libs"))
 
 proc run(argc: CppInt, argv: CppUnsizedArray[CppCharPtr])
    {.import_cpp: "ensnare::run(@)", header: "ensnare/private/main.hpp".}

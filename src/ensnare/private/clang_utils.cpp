@@ -33,11 +33,40 @@ Str ensnare::render(const clang::Stmt& stmt) {
    return stream.str();
 }
 
-Str ensnare::render(clang::TemplateArgument arg) {
+Str ensnare::render(const clang::TemplateArgument& arg) {
    Str temp;
    llvm::raw_string_ostream stream(temp);
    arg.dump(stream);
    return stream.str();
+}
+
+Str ensnare::render(const clang::TemplateName& name) {
+   Str temp;
+   llvm::raw_string_ostream stream(temp);
+   name.dump(stream);
+   return stream.str();
+}
+
+Str ensnare::render(const clang::Type& type) {
+   Str temp;
+   llvm::raw_string_ostream stream(temp);
+   type.dump(stream);
+   return stream.str();
+}
+
+Str ensnare::render(clang::TemplateArgument::ArgKind kind) {
+   switch (kind) {
+      case clang::TemplateArgument::Null: return "Null";
+      case clang::TemplateArgument::Type: return "Type";
+      case clang::TemplateArgument::Declaration: return "Declaration";
+      case clang::TemplateArgument::NullPtr: return "NullPtr";
+      case clang::TemplateArgument::Integral: return "Integral";
+      case clang::TemplateArgument::Template: return "Template";
+      case clang::TemplateArgument::TemplateExpansion: return "TemplateExpansion";
+      case clang::TemplateArgument::Expression: return "Expression";
+      case clang::TemplateArgument::Pack: return "Pack";
+      default: return "unhandled: render(clang::TemplateArg::ArgKind)";
+   }
 }
 
 bool ensnare::eq_ident(const clang::NamedDecl& a, const clang::NamedDecl& b) {

@@ -73,11 +73,14 @@ class Param {
    private:
    Sym _name;
    Type _type;
+   Opt<Expr> _expr;
 
    public:
    Sym name() const;
    Type type() const;
+   Opt<Expr> expr() const;
    Param(Sym name, Type type);
+   Param(Sym name, Type type, Expr expr);
 };
 
 using Params = Vec<Param>;
@@ -99,13 +102,14 @@ class ConstructorDecl {
    public:
    const Str cpp_name;
    const Str header;
-   const TemplateParams self_template_params;
+   const Opt<TemplateParams> self_template_params;
    const Type self;
    const Opt<TemplateParams> template_params;
    const Params params;
-   ConstructorDecl(Str cpp_name, Str header, Type self, Params params);
-   ConstructorDecl(Str cpp_name, Str header, Type self, TemplateParams template_params,
+   ConstructorDecl(Str cpp_name, Str header, Opt<TemplateParams> self_template_params, Type self,
                    Params params);
+   ConstructorDecl(Str cpp_name, Str header, Opt<TemplateParams> self_template_params, Type self,
+                   TemplateParams template_params, Params params);
 };
 
 class MethodDecl {
@@ -113,14 +117,17 @@ class MethodDecl {
    const Sym name;
    const Str cpp_name;
    const Str header;
-   const TemplateParams self_template_params;
+   const Opt<TemplateParams> self_template_params;
    const Type self;
    const Opt<TemplateParams> template_params;
    const Params params;
    const Opt<Type> return_type;
-   MethodDecl(Str name, Str cpp_name, Str header, Type self, Params params, Opt<Type> return_type);
-   MethodDecl(Str name, Str cpp_name, Str header, Type self, TemplateParams template_params,
-              Params params, Opt<Type> return_type);
+   const bool is_static;
+   MethodDecl(Str name, Str cpp_name, Str header, Opt<TemplateParams> self_template_params,
+              Type self, Params params, Opt<Type> return_type, bool is_static = false);
+   MethodDecl(Str name, Str cpp_name, Str header, Opt<TemplateParams> self_template_params,
+              Type self, TemplateParams template_params, Params params, Opt<Type> return_type,
+              bool is_static = false);
 };
 
 using RoutineDeclObj = Union<FunctionDecl, ConstructorDecl, MethodDecl>;

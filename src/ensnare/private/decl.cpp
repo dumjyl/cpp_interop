@@ -37,8 +37,6 @@ SymObj& ensnare::name(TypeDecl decl) {
    }
 }
 
-ensnare::Param::Param(Sym name, Type type) : _name(name), _type(type) {}
-
 ensnare::TemplateParam::TemplateParam(Sym name) : name(name) {}
 
 ensnare::TemplateParam::TemplateParam(Sym name, Type constraint)
@@ -50,9 +48,15 @@ Node<TemplateParam> ensnare::new_TemplateParam(Sym name, Type constraint) {
    return node<TemplateParam>(name, constraint);
 }
 
+ensnare::Param::Param(Sym name, Type type) : _name(name), _type(type) {}
+
+ensnare::Param::Param(Sym name, Type type, Expr expr) : _name(name), _type(type), _expr(expr) {}
+
 Sym ensnare::Param::name() const { return _name; }
 
 Type ensnare::Param::type() const { return _type; }
+
+Opt<Expr> ensnare::Param::expr() const { return _expr; }
 
 ensnare::FunctionDecl::FunctionDecl(Str name, Str cpp_name, Str header, Params params,
                                     Opt<Type> return_type)
@@ -72,17 +76,50 @@ ensnare::FunctionDecl::FunctionDecl(Str name, Str cpp_name, Str header,
      params(params),
      return_type(return_type) {}
 
-ensnare::ConstructorDecl::ConstructorDecl(Str cpp_name, Str header, Type self, Params params)
-   : cpp_name(cpp_name), header(header), self(self), params(params) {}
+ensnare::ConstructorDecl::ConstructorDecl(Str cpp_name, Str header,
+                                          Opt<TemplateParams> self_template_params, Type self,
+                                          Params params)
+   : cpp_name(cpp_name),
+     header(header),
+     self_template_params(self_template_params),
+     self(self),
+     params(params) {}
 
-ensnare::MethodDecl::MethodDecl(Str name, Str cpp_name, Str header, Type self, Params params,
-                                Opt<Type> return_type)
+ensnare::ConstructorDecl::ConstructorDecl(Str cpp_name, Str header,
+                                          Opt<TemplateParams> self_template_params, Type self,
+                                          TemplateParams template_params, Params params)
+   : cpp_name(cpp_name),
+     header(header),
+     self_template_params(self_template_params),
+     self(self),
+     template_params(template_params),
+     params(params) {}
+
+ensnare::MethodDecl::MethodDecl(Str name, Str cpp_name, Str header,
+                                Opt<TemplateParams> self_template_params, Type self, Params params,
+                                Opt<Type> return_type, bool is_static)
    : name(new_Sym(name)),
      cpp_name(cpp_name),
      header(header),
+     self_template_params(self_template_params),
      self(self),
      params(params),
-     return_type(return_type) {}
+     return_type(return_type),
+     is_static(is_static) {}
+
+ensnare::MethodDecl::MethodDecl(Str name, Str cpp_name, Str header,
+                                Opt<TemplateParams> self_template_params, Type self,
+                                TemplateParams template_params, Params params,
+                                Opt<Type> return_type, bool is_static)
+   : name(new_Sym(name)),
+     cpp_name(cpp_name),
+     header(header),
+     self_template_params(self_template_params),
+     self(self),
+     template_params(template_params),
+     params(params),
+     return_type(return_type),
+     is_static(is_static) {}
 
 ensnare::VariableDeclObj::VariableDeclObj(Str name, Str cpp_name, Str header, Type type)
    : name(new_Sym(name)), cpp_name(cpp_name), header(header), type(type) {}

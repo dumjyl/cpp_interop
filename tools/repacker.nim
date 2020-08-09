@@ -1,7 +1,6 @@
 import
    pkg/std_ext,
-   pkg/std_ext/[os,
-                str_utils],
+   pkg/std_ext/[os, str_utils],
    build
 
 proc touch(file: string) =

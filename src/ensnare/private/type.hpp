@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ensnare/private/sym.hpp"
 #include "ensnare/private/expr.hpp"
+#include "ensnare/private/sym.hpp"
 #include "ensnare/private/utils.hpp"
 
 namespace ensnare {
@@ -42,9 +42,10 @@ class OpaqueType {};
 /// A generic instantiation: `T<A, B, C>`
 class InstType {
    public:
-   const Sym name;
-   const Vec<Type> types;
-   InstType(Sym name, Vec<Type> types);
+   using Arg = Union<Expr, Type>;
+   const Type type;
+   const Vec<Arg> args;
+   InstType(Type type, Vec<Arg> args);
 };
 
 /// An unsized array that should appear as a parameter or the last member of a struct: `T foo[]`
@@ -63,12 +64,11 @@ class ArrayType {
    ArrayType(Expr size, Type type);
 };
 
-///
 class FuncType {
    public:
    const Vec<Type> params;
-   const Type return_type;
-   FuncType(Vec<Type> params, Type return_type);
+   const Opt<Type> return_type;
+   FuncType(Vec<Type> params, Opt<Type> return_type);
 };
 
 class ConstType {

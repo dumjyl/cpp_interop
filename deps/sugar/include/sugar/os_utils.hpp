@@ -4,18 +4,25 @@
 
 #include <fstream>
 
-#ifdef __ARM_ARCH_ISA_A64
-#include <experimental/filesystem>
-#else
+#if defined(__has_include)
+#if __has_include(<filesystem>)
 #include <filesystem>
+namespace sugar {
+namespace fs = std::filesystem;
+}
+#elif __has_include(<experimental/filesystem>)
+#include <experimental/filesystem>
+namespace sugar {
+namespace fs = std::experimental::filesystem;
+}
+#else
+#error "missing c++17 filesystem header"
+#endif
+#else
+#error "compiler missing __has_include builtin"
 #endif
 
 namespace sugar {
-#ifdef __ARM_ARCH_ISA_A64
-namespace fs = std::experimental::filesystem;
-#else
-namespace fs = std::filesystem;
-#endif
 
 using Path = fs::path;
 

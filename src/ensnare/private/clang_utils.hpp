@@ -21,7 +21,13 @@ Str render(const clang::Decl* decl);
 /// Render an statement as a string. For debugging.
 Str render(const clang::Stmt& stmt);
 
-Str render(clang::TemplateArgument arg);
+Str render(const clang::TemplateArgument& arg);
+
+Str render(const clang::TemplateName& name);
+
+Str render(const clang::Type& type);
+
+Str render(clang::TemplateArgument::ArgKind kind);
 
 inline void log(Str msg, const clang::NamedDecl& decl) {
    if constexpr (debug) {
@@ -69,6 +75,7 @@ inline bool visit(clang::ASTUnit& translation_unit, T& context, DeclVisitor<T> v
       private:
       T& context;
       DeclVisitor<T> visitor;
+
       public:
       bool result = false;
 

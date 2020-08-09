@@ -2,15 +2,6 @@
 
 #include "ensnare/private/str_utils.hpp"
 
-// FIXME: move to os utils.
-#ifdef __ARM_ARCH_ISA_A64
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#else
-#include <filesystem>
-namespace fs = std::filesystem;
-#endif
-
 using namespace ensnare;
 
 HeaderCanonicalizer::IncludeDirMap ensnare::HeaderCanonicalizer::init_include_dir_map(const Config& cfg) const {

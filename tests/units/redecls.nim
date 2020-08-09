@@ -13,11 +13,11 @@ type
       base: ptr foo_t
 
 proc `{}`*(�: type[lexbor_mem_chunk]): lexbor_mem_chunk
-   {.import_cpp: "lexbor_mem_chunk::lexbor_mem_chunk(@)", header: "redecls2.hpp".}
+   {.import_cpp: "'0(@)", header: "redecls2.hpp".}
 proc `{}`*(�: type[lexbor_mem_chunk], �1: var CppConst[lexbor_mem_chunk]): lexbor_mem_chunk
-   {.import_cpp: "lexbor_mem_chunk::lexbor_mem_chunk(@)", header: "redecls2.hpp".}
-proc `{}`*(�: type[lexbor_mem_chunk], �1: var lexbor_mem_chunk): lexbor_mem_chunk
-   {.import_cpp: "lexbor_mem_chunk::lexbor_mem_chunk(@)", header: "redecls2.hpp".}
+   {.import_cpp: "'0(@)", header: "redecls2.hpp".}
+proc `{}`*(�: type[lexbor_mem_chunk], �1: lexbor_mem_chunk): lexbor_mem_chunk
+   {.import_cpp: "'0(@)", header: "redecls2.hpp".}
 
 var
    type_map* {.import_cpp: "type_map", header: "redecls.hpp".}: lexbor_mem_chunk_t

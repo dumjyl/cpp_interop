@@ -10,8 +10,11 @@ class ConstParamExpr;
 /// Used within an Expr.
 using ExprObj = Union<LitExpr<U64>, LitExpr<I64>, ConstParamExpr>;
 
-/// Roughly maps to clang::Expr. This is currently only used to manage constant generic expressions
-/// that we cannot resolve. It may be used to translate templates or even entire headers wholesale.
+/// Roughly maps to clang::Expr.
+/// Uses:
+///    constant generic expressions that we cannot resolve (can we ever resolve them? idk i'm drunk)
+///    default arguments
+/// It may be used to translate templates or even entire headers wholesale.
 using Expr = Node<ExprObj>;
 
 /// An expression that represents a literal of type `T`.

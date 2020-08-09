@@ -2,7 +2,8 @@ namespace blah {
 class Foo {
    int a;
    int b;
-   void dont_bind(){};
+
+   void dont_bind() {}
 
    public:
    Foo* recursive_field;
@@ -14,6 +15,8 @@ class Foo {
    void recusive_meth(const Foo* x) {}
 
    int calc(int x) { return x + a + b; }
+
+   static Foo init(int a = 12) { return Foo(a, a * 2); }
 };
 
 using VP = void*;
@@ -53,3 +56,10 @@ int _;
 struct SepTypedef {};
 
 typedef struct SepTypedef SepTypedef;
+
+using FnPtr = void (*)(int a);
+// Idk if anyone uses these. If they are, some valid operations on them won't work in nim.
+// Probably doesn't matter since they are so niche.
+using FnRef = void (&)(int a);
+using FnRValueRef = void(&&)(int a);
+

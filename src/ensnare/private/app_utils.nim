@@ -12,9 +12,9 @@ template main*(stmts) =
             quit(er.msg, er.code)
       main()
 
-template request_exit*(code: int, msg: string) =
+template request_exit*(exit_code: int, msg: string) =
    let er = new_Exception(ExitRequest, msg)
-   er.code = code
+   er.code = exit_code
    raise er
 
 template fatal*(msg: varargs[string, `$`]) =

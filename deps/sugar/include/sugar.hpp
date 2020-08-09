@@ -11,13 +11,18 @@
 #include <vector>
 
 namespace sugar {
-/// Ignore. Template recursion base case.
-template <typename... Args> void write(std::ostream& out, Args... args) {}
+// good stuff: https://florianjw.de/en/variadic_templates.html
+template <typename... Args> void discard(Args... args) {}
+
+// and again: https://florianjw.de/en/passing_overloaded_functions.html
+#define LAMBDA(...)                                                                                \
+   [](auto&&... args) -> decltype(auto) {                                                          \
+      return __VA_ARGS__(std::forward<decltype(args)>(args)...);                                   \
+   }
 
 /// Write some arguments to a output stream.
-template <typename Arg, typename... Args> void write(std::ostream& out, Arg arg, Args... args) {
-   out << arg;
-   write(out, args...);
+template <typename... Args> void write(std::ostream& out, Args... args) {
+   discard(((void)(out << args), 0)...);
 }
 
 /// Write some arguments to `std::cout` stream.
@@ -62,7 +67,7 @@ using Size = std::size_t;
 static_assert(sizeof(F32) == 4);
 static_assert(sizeof(F64) == 8);
 
-template <typename... Variants> using Union = const std::variant<Variants...>;
+template <typename... Variants> using Union = std::variant<Variants...>;
 
 using Str = std::string;
 template <typename T> using Vec = std::vector<T>;

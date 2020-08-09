@@ -18,15 +18,20 @@ type
       xyz_field: `type_of(XYZ-xyz_field)`
    `type_of(anon_union_var)`* {.import_cpp: "decltype(anon_union_var)", header: "abc.hpp".} = object
    SepTypedef* {.import_cpp: "SepTypedef", header: "abc.hpp".} = object
+   FnPtr* = proc (�0: CppInt)
+   FnRef* = proc (�0: CppInt)
+   FnRValueRef* = proc (�0: CppInt)
 
 proc `{}`*(�: type[`blah-Foo`], a: CppInt, b: CppInt): `blah-Foo`
-   {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
+   {.import_cpp: "'0(@)", header: "abc.hpp".}
 proc recusive_meth*(�: `blah-Foo`, x: ptr CppConst[`blah-Foo`])
-   {.import_cpp: "blah::Foo::recusive_meth(@)", header: "abc.hpp".}
+   {.import_cpp: "#.recusive_meth(@)", header: "abc.hpp".}
 proc calc*(�: `blah-Foo`, x: CppInt): CppInt
-   {.import_cpp: "blah::Foo::calc(@)", header: "abc.hpp".}
+   {.import_cpp: "#.calc(@)", header: "abc.hpp".}
+proc init*(�: type[`blah-Foo`], a: CppInt = 12): `blah-Foo`
+   {.import_cpp: "'0::init(@)", header: "abc.hpp".}
 proc `{}`*(�: type[`blah-Foo`], �1: var CppConst[`blah-Foo`]): `blah-Foo`
-   {.import_cpp: "blah::Foo::Foo(@)", header: "abc.hpp".}
+   {.import_cpp: "'0(@)", header: "abc.hpp".}
 proc sum*(a: CppFloat, b: CppFloat): CppFloat
    {.import_cpp: "blah::sum(@)", header: "abc.hpp".}
 
@@ -39,3 +44,12 @@ var
    abc_a���* {.import_cpp: "abc_a___", header: "abc.hpp".}: CppInt
    ��* {.import_cpp: "__", header: "abc.hpp".}: CppInt
    �* {.import_cpp: "_", header: "abc.hpp".}: CppInt
+
+#% run
+
+proc main =
+   let x = `blah-Foo`{1, 2}
+   assert(x.calc(3) == 6)
+   assert(sum(1, 3) == 4)
+
+main()

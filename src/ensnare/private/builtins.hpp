@@ -28,7 +28,6 @@ Type _bool = init("CppBool");                ///< Represents `bool`.
 Type _float = init("CppFloat");              ///< Represents `float`.
 Type _double = init("CppDouble");            ///< Represents `double`.
 Type _long_double = init("CppLongDouble");   ///< Represents `long double`.
-Type _void = init("CppVoid");                ///< Represents `void`
 Type _int128 = init("CppInt128");            ///< Represents `__int128_t`
 Type _uint128 = init("CppUInt128");          ///< Represents `__uint128_t`
 Type _neon_float16 = init("CppNeonFloat16"); ///< Represents `__fp16`
@@ -41,6 +40,6 @@ Type _ptrdiff = init("CppPtrDiff");    ///< Represents `std::ptrdiff_t`.
 Type _max_align = init("CppMaxAlign"); ///< Represents `std::max_align_t`.
 Type _byte = init("CppByte");          ///< Represents `std::byte`.
 Type _nullptr = init("CppNullPtr");    ///< Represents `decltype(nullptr)` and `std::nullptr_t`.
-
+Type _void = init("void");
 Type _void_ptr = init("pointer");
 } // namespace ensnare::builtins
